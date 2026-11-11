@@ -1,9 +1,9 @@
 /* =========================================================================
- * Tab "Hướng dẫn": hướng dẫn sử dụng bộ công cụ (Tài liệu + Diagram + Chat AI).
+ * Tab "Hướng dẫn": hướng dẫn sử dụng bộ công cụ (Tài liệu + Diagram + Thiết kế trang + Chat AI).
  * Nội dung viết bằng Markdown (DE.GUIDE_MD), render bằng js/markdown.js.
  *  - Mục lục bên trái (tự sinh từ tiêu đề), tìm kiếm lọc theo mục.
- *  - Dòng "💬 Tài liệu: …" / "💬 Diagram: …" có nút "Thử" – gửi ví dụ vào khung chat AI.
- *  - Link [chữ](#go-doc) / (#go-diagram) chuyển sang tab tương ứng.
+ *  - Dòng "💬 Tài liệu: …" / "💬 Diagram: …" / "💬 Trang: …" có nút "Thử" – gửi ví dụ vào khung chat AI.
+ *  - Link [chữ](#go-doc) / (#go-diagram) / (#go-design) chuyển sang tab tương ứng.
  * ========================================================================= */
 (function (DE) {
   'use strict';
@@ -14,8 +14,8 @@
 # Hướng dẫn sử dụng
 
 **Diagram Editor** là bộ công cụ soạn **tài liệu thiết kế phần mềm**: viết tài liệu như soạn văn bản, vẽ diagram
-(Flowchart, BPMN, UML, ERD) trên whiteboard rồi nhúng vào tài liệu, và nhờ **AI** viết giúp cả tài liệu lẫn diagram.
-Mọi thứ chạy ngay trên trình duyệt, không cần tài khoản, dữ liệu nằm trên máy bạn.
+(Flowchart, BPMN, UML, ERD) trên whiteboard rồi nhúng vào tài liệu, **thiết kế trang web bằng kéo thả**, và nhờ **AI**
+viết giúp cả tài liệu, diagram lẫn trang web. Mọi thứ chạy ngay trên trình duyệt, không cần tài khoản, dữ liệu nằm trên máy bạn.
 
 ## Bắt đầu nhanh
 
@@ -26,20 +26,22 @@ Mọi thứ chạy ngay trên trình duyệt, không cần tài khoản, dữ li
 
 - 💬 Tài liệu: Viết đặc tả chức năng đặt hàng online, có use case diagram và sequence diagram
 - 💬 Diagram: Vẽ quy trình duyệt đơn nghỉ phép bằng BPMN có 2 lane: Nhân viên và Quản lý
+- 💬 Trang: Dựng trang giới thiệu cho tiệm bánh ngọt: thanh điều hướng, ảnh bìa, 3 món nổi bật và form đặt bánh
 
 > [!TIP]
-> Khung chat AI có ở cả ba tab. Lần đầu dùng, bấm chip **API key** trong khung chat để chọn nhà cung cấp AI
+> Khung chat AI có ở mọi tab. Lần đầu dùng, bấm chip **API key** trong khung chat để chọn nhà cung cấp AI
 > (có nhiều lựa chọn miễn phí – xem mục [Chat AI](#chat-ai)).
 
 ## Giao diện
 
-Ba tab ở trên cùng:
+Bốn tab ở trên cùng:
 
 | Tab | Phím tắt | Dùng để |
 | --- | --- | --- |
 | 📄 **Tài liệu** | \`Alt+1\` | Soạn và xem tài liệu \`.md\`, nhúng diagram |
 | ◆ **Diagram** | \`Alt+2\` | Whiteboard vẽ diagram |
-| ❓ **Hướng dẫn** | \`Alt+3\` | Trang bạn đang đọc |
+| ▤ **Thiết kế trang** | \`Alt+3\` | Dựng trang web bằng kéo thả, xuất file HTML |
+| ❓ **Hướng dẫn** | \`Alt+4\` | Trang bạn đang đọc |
 
 Thanh công cụ chia thành **các nhóm**; khi cửa sổ hẹp, các nhóm tự **xuống hàng** để mọi nút vẫn luôn hiện đủ.
 
@@ -109,6 +111,7 @@ tab **Trợ giúp** ở bảng bên phải giải thích ý nghĩa từng ký hi
 | --- | --- |
 | Thêm hình | Kéo hình từ thư viện bên trái vào whiteboard (hoặc bấm vào hình) |
 | Nối hai hình | Rê chuột lên hình, kéo từ chấm xanh sang hình kia; thả ra chỗ trống để tạo nhanh hình mới đã nối |
+| Dời đoạn giữa của mũi tên vuông góc | Chọn mũi tên, kéo tay nắm ở giữa (hoặc chính đoạn giữa); nhấn đúp tay nắm để về tự động |
 | Sửa chữ | Nhấn đúp vào hình hoặc đường nối · \`Ctrl+Enter\` lưu · \`Esc\` huỷ |
 | Thêm chữ tự do | Nhấn đúp vào chỗ trống |
 | Chọn nhiều | Kéo vùng chọn, hoặc giữ \`Shift\` khi bấm |
@@ -122,6 +125,73 @@ tab **Trợ giúp** ở bảng bên phải giải thích ý nghĩa từng ký hi
 - **JSON**: định dạng gốc, mở lại để sửa tiếp. **SVG / PNG**: ảnh.
 - **Nhúng SVG**: mã dán thẳng vào file Markdown bất kỳ.
 - Tab **JSON** ở bảng bên phải: xem / sửa toàn bộ dữ liệu diagram, bấm **Áp dụng**.
+
+## Thiết kế trang
+
+Tab **[Thiết kế trang](#go-design)** dựng trang web bằng **kéo thả** – giống Figma nhưng đơn giản hơn nhiều: bạn không vẽ
+từng hình mà xếp các **thành phần dựng sẵn** (hàng, cột, nút bấm, menu, bảng…) vào trang. Trang tự co giãn cho
+máy tính, máy tính bảng và điện thoại. Lần đầu mở tab có sẵn một **dự án mẫu 3 trang** để bạn xem và sửa thử.
+
+### Bố cục màn hình
+
+- **Bên trái – Thành phần**: thư viện thành phần. **Kéo** một thành phần thả vào trang (vạch xanh lá cho biết chỗ sẽ thả),
+  hoặc **bấm** để thêm vào ngay sau thành phần đang chọn. Tab **Lớp** hiện cây các thành phần của trang: bấm để chọn,
+  kéo để đổi chỗ / đổi khung chứa, nhấn đúp để đặt tên.
+- **Giữa – trang**: bấm để chọn, **nhấn đúp vào chữ / nút / ô bảng để sửa ngay trên trang**. Các trang của dự án là
+  các tab phía trên (**＋ Trang** để thêm – trang mới chép sẵn phần đầu và chân trang của trang chủ).
+- **Bên phải – Thuộc tính**: chỉnh thành phần đang chọn, chia nhóm (bấm tên nhóm để mở / đóng). Không chọn gì thì bảng
+  này là thiết lập của **trang** và **cả dự án** (font chữ chung, màu chủ đạo…). Tab **JSON** cho người rành kỹ thuật.
+
+Nhãn xanh trên thành phần đang chọn có các nút: ⤴ chọn khung chứa bên ngoài · ✥ giữ để kéo di chuyển · ↑ ↓ đổi thứ tự ·
+nhân bản · xoá.
+
+### Thành phần có sẵn
+
+| Nhóm | Thành phần | Ghi chú |
+| --- | --- | --- |
+| Bố cục | Khối trang · Hàng · Cột · Thẻ | **Khối trang** là dải ngang cả trang (phần đầu, nội dung, chân trang); **Hàng** xếp con theo hàng ngang; **Cột** xếp con theo chiều dọc – đặt nhiều cột trong một hàng để chia cột |
+| Nội dung | Tiêu đề · Đoạn văn · Nút bấm · Ảnh · Danh sách | Ảnh: dán địa chỉ, tải từ máy hoặc kéo thả file ảnh vào trang |
+| Điều hướng | Menu bảng nhỏ · Menu toàn trang · Nút mở menu ☰ | Menu chỉ hiện khi bấm nút có loại “Mở menu” |
+| Biểu mẫu | Biểu mẫu · Ô nhập · Ô nhiều dòng · Hộp chọn · Ô đánh dấu · Nút gửi | Đặt các ô và nút gửi **bên trong** một Biểu mẫu |
+| Dữ liệu | Bảng | Sửa ô ngay trên trang (\`Tab\` sang ô kế), hoặc dán từ Excel |
+| Ngăn cách | Thanh ngang · Thanh dọc · Khoảng trống | Thanh dọc dùng trong một Hàng |
+| Mẫu dựng sẵn | Thanh điều hướng · Ảnh bìa · 3 tính năng · Bảng giá · Biểu mẫu liên hệ · Chân trang | Kéo vào là có cả cụm đã căn chỉnh đẹp |
+
+### Nút bấm
+
+- **Định dạng**: kiểu nhanh (nền đặc, viền, nền nhạt, chỉ chữ), kích thước, màu nền, màu chữ, viền, font, cỡ chữ,
+  đậm / nghiêng / gạch chân / IN HOA, giãn cách chữ, độ rộng (vừa chữ, giãn hết, cố định), đệm trong, bo góc, đổ bóng.
+- **Loại nút – khi bấm** (chọn một): **Chuyển trang** (tới một trang trong dự án hoặc một địa chỉ web) ·
+  **Mở menu** (chọn menu, hoặc tạo menu mới ngay tại đó) · **Gửi / chạy chức năng** (gửi biểu mẫu chứa nút,
+  hiện một thông báo, hoặc gọi hàm JavaScript viết trong “Mã JavaScript của dự án”).
+- **Hiệu ứng khi di chuột qua / khi bấm**: tích các thay đổi muốn có – đổi màu nền / chữ / viền, phóng to, nhấc lên,
+  đổ bóng, độ rõ – và chọn tốc độ. Bấm **Khi di chuột qua** / **Khi bấm** ở dòng “Xem trước” để thấy ngay trên trang.
+
+Thẻ, ảnh, hàng, cột… cũng có nhóm hiệu ứng này (ví dụ thẻ nhấc lên khi di chuột qua).
+
+### Menu
+
+- Hai loại: **bảng nhỏ** (hiện ngay cạnh nút – dưới nút căn trái / phải, hoặc trên nút) và **toàn trang** (phủ kín màn hình,
+  hợp cho điện thoại, có nút đóng ×).
+- Thuộc tính: nền (màu, ảnh nền, làm tối ảnh), bo góc, viền, bóng, cách xếp các mục, hiệu ứng mở, đóng khi bấm ra ngoài /
+  khi chọn một mục.
+- Trên trang soạn, menu thu thành một **dải tím mỏng** để bố cục giống trang thật; bấm vào dải (hoặc chọn trong tab Lớp)
+  để mở ra và sửa các mục. Các mục menu thường là **Nút bấm** kiểu “chỉ chữ”.
+
+### Màn hình nhỏ (responsive)
+
+- Đổi **Máy tính / Máy tính bảng / Điện thoại** trên thanh công cụ để xem trang ở từng cỡ màn hình.
+- **Hàng** tự xếp chồng thành cột trên điện thoại (tắt bằng “Trên điện thoại: xếp chồng thành cột dọc”).
+- Nhóm **Hiển thị** của mọi thành phần có **Ẩn trên điện thoại** / **Ẩn trên máy tính** – ví dụ thanh nút chỉ hiện trên máy tính,
+  còn nút ☰ mở menu toàn trang chỉ hiện trên điện thoại (thanh điều hướng mẫu đã làm sẵn như vậy).
+
+### Xem thử và xuất file
+
+- **▶ Xem thử**: chạy trang như thật – bấm nút, mở menu, chuyển trang, gửi biểu mẫu – ở cỡ máy tính, máy tính bảng hoặc điện thoại.
+- **Tải xuống HTML**: một file \`.html\` chứa **mọi trang** (chuyển trang bằng địa chỉ \`#/duong-dan\`), mở bằng trình duyệt
+  hoặc đưa lên hosting tĩnh (GitHub Pages, Netlify…).
+- **Tải xuống JSON** (\`Ctrl+S\`): file dự án để mở lại và sửa tiếp (nút Mở, \`Ctrl+O\`, hoặc kéo thả file vào cửa sổ).
+- Dự án **tự lưu vào trình duyệt**. Ảnh tải lên được nhúng thẳng vào dự án (ảnh lớn tự thu nhỏ còn cạnh dài 1600px).
 
 ## Chat AI
 
@@ -142,6 +212,8 @@ AI biết bạn đang ở tab nào:
 - **Tab Tài liệu** – AI viết mới hoặc sửa **toàn bộ tài liệu**, có thể **tự vẽ diagram** và chèn vào đúng chỗ.
   Không ưng: bấm **↶ Hoàn tác thay đổi của AI** trong khung chat.
 - **Tab Diagram** – AI vẽ / sửa diagram đang mở. Không ưng: \`Ctrl+Z\`.
+- **Tab Thiết kế trang** – AI dựng mới hoặc sửa **cả dự án trang web** (thêm trang, đổi màu, thêm menu, biểu mẫu…).
+  Không ưng: **↶ Hoàn tác thay đổi của AI** hoặc \`Ctrl+Z\`.
 - **Tab Hướng dẫn** – hỏi AI cách dùng công cụ.
 
 Gửi bằng nút **Gửi** hoặc \`Ctrl+Enter\`. AI nhớ các lượt trước trong cuộc trò chuyện; nút ↻ để bắt đầu cuộc trò chuyện mới.
@@ -155,14 +227,17 @@ Gửi bằng nút **Gửi** hoặc \`Ctrl+Enter\`. AI nhớ các lượt trướ
 - 💬 Diagram: Vẽ sequence diagram cho chức năng đăng nhập bằng OTP
 - 💬 Diagram: Vẽ ERD cho hệ thống bán hàng gồm khách hàng, đơn hàng, sản phẩm
 - 💬 Diagram: Đổi tất cả các hình xử lý sang màu xanh nhạt
+- 💬 Trang: Thêm trang Bảng giá có 3 gói và nút Đăng ký mở form liên hệ
+- 💬 Trang: Đổi màu chủ đạo của cả trang sang xanh lá và dùng font Be Vietnam Pro
 
 ### Dùng với AI bên ngoài (không cần API key)
 
-Bấm **Copy context** trong khung chat → chọn **Tài liệu Markdown** (hoặc một chế độ diagram) → **Sao chép skill** → dán vào
+Bấm **Copy context** trong khung chat → chọn **Tài liệu Markdown**, **Thiết kế trang** (hoặc một chế độ diagram) → **Sao chép skill** → dán vào
 ChatGPT, Gemini, Claude… kèm yêu cầu. Sau đó:
 
 - Tài liệu: sao chép toàn bộ câu trả lời của AI, **dán thẳng vào tab Tài liệu** – diagram trong câu trả lời tự thành diagram sửa được.
 - Diagram: dán khối JSON vào tab **JSON** (bảng bên phải tab Diagram) → **Áp dụng**.
+- Thiết kế trang: dán khối JSON vào tab **JSON** (bảng bên phải tab Thiết kế trang) → **Áp dụng**, hoặc lưu thành file \`.json\` rồi kéo thả vào cửa sổ.
 
 ## Giọng nói
 
@@ -175,7 +250,7 @@ ChatGPT, Gemini, Claude… kèm yêu cầu. Sau đó:
 
 | Ở đâu | Phím | Việc |
 | --- | --- | --- |
-| Mọi nơi | \`Alt+1\` / \`Alt+2\` / \`Alt+3\` | Tab Tài liệu / Diagram / Hướng dẫn |
+| Mọi nơi | \`Alt+1\` / \`Alt+2\` / \`Alt+3\` / \`Alt+4\` | Tab Tài liệu / Diagram / Thiết kế trang / Hướng dẫn |
 | Mọi nơi | \`Ctrl+Enter\` (trong ô chat) | Gửi cho AI |
 | Mọi nơi | \`Ctrl+M\` · \`Ctrl+Shift+M\` | Nói với AI · rảnh tay |
 | Tài liệu | \`Ctrl+S\` · \`Ctrl+Shift+S\` · \`Ctrl+O\` | Lưu · lưu thành · mở |
@@ -187,6 +262,11 @@ ChatGPT, Gemini, Claude… kèm yêu cầu. Sau đó:
 | Diagram | \`Ctrl\` + cuộn · \`Shift+1\` | Zoom · vừa màn hình |
 | Diagram | \`Ctrl+S\` · \`Ctrl+O\` | Tải JSON · mở JSON |
 | Diagram | \`Ctrl+B\` · \`Ctrl+Alt+B\` | Thu gọn thư viện · bảng thuộc tính |
+| Thiết kế trang | nhấn đúp · \`Enter\` | Sửa chữ của thành phần đang chọn (\`Esc\` huỷ) |
+| Thiết kế trang | \`Esc\` · \`↑\` \`↓\` | Chọn khung chứa bên ngoài · chọn thành phần trước / sau |
+| Thiết kế trang | \`Alt+↑\` / \`Alt+↓\` | Đưa thành phần lên trước / xuống sau |
+| Thiết kế trang | \`Ctrl+C\` · \`Ctrl+X\` · \`Ctrl+V\` · \`Ctrl+D\` · \`Delete\` | Sao chép · cắt · dán · nhân bản · xoá |
+| Thiết kế trang | \`Ctrl+Z\` / \`Ctrl+Y\` · \`Ctrl+S\` · \`Ctrl+O\` | Hoàn tác / làm lại · tải JSON · mở JSON |
 
 ## Câu hỏi thường gặp
 
@@ -203,7 +283,12 @@ Mở khung xem trước Markdown (\`Ctrl+Shift+V\`). Trình xem chặn HTML (nh�
 [Diagram nằm trong file .md như thế nào?](#diagram-nằm-trong-file-md-như-thế-nào).
 
 **Lỡ tay xoá / AI sửa sai?**
-Trong tài liệu: \`Ctrl+Z\`, hoặc nút **↶ Hoàn tác thay đổi của AI** trong khung chat. Trong diagram: \`Ctrl+Z\` hoặc nút ↶.
+Trong tài liệu: \`Ctrl+Z\`, hoặc nút **↶ Hoàn tác thay đổi của AI** trong khung chat. Trong diagram và thiết kế trang: \`Ctrl+Z\` hoặc nút ↶.
+
+**Trang web thiết kế xong đưa lên mạng thế nào?**
+Bấm **Tải xuống HTML** ở tab Thiết kế trang. File đó chạy độc lập: đổi tên thành \`index.html\` rồi tải lên bất kỳ dịch vụ
+hosting tĩnh nào (GitHub Pages, Netlify, Cloudflare Pages…). Nếu nút gọi hàm JavaScript, hãy viết hàm trong
+“Mã JavaScript của dự án” (bỏ chọn mọi thành phần để thấy ô này).
 `;
 
   const G = (DE.guide = {});
@@ -252,15 +337,15 @@ Trong tài liệu: \`Ctrl+Z\`, hoặc nút **↶ Hoàn tác thay đổi của AI
 
     // ví dụ prompt: nút "Thử"
     body.querySelectorAll('li').forEach((li) => {
-      const m = li.textContent.trim().match(/^💬\s*(Tài liệu|Diagram):\s*([\s\S]+)$/);
+      const m = li.textContent.trim().match(/^💬\s*(Tài liệu|Diagram|Trang):\s*([\s\S]+)$/);
       if (!m) return;
       li.classList.add('guide-try');
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'btn guide-try-btn';
       b.textContent = 'Thử ↗';
-      b.title = `Mở tab ${m[1]} và đưa câu này vào khung chat AI`;
-      b.dataset.ws = m[1] === 'Tài liệu' ? 'doc' : 'diagram';
+      b.title = `Mở tab ${m[1] === 'Trang' ? 'Thiết kế trang' : m[1]} và đưa câu này vào khung chat AI`;
+      b.dataset.ws = { 'Tài liệu': 'doc', Diagram: 'diagram', Trang: 'design' }[m[1]];
       b.dataset.prompt = m[2].trim();
       li.appendChild(b);
     });
@@ -272,7 +357,7 @@ Trong tài liệu: \`Ctrl+Z\`, hoặc nút **↶ Hoàn tác thay đổi của AI
       if (!a) return;
       e.preventDefault();
       const id = decodeURIComponent(a.getAttribute('href').slice(1));
-      const go = id.match(/^(?:md-)?go-(doc|diagram|guide)$/);
+      const go = id.match(/^(?:md-)?go-(doc|diagram|design|guide)$/);
       if (go) return DE.docs.show(go[1]);
       const t = document.getElementById(id) || document.getElementById(id.replace(/^md-/, ''));
       if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });

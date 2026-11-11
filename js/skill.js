@@ -8,7 +8,7 @@
 (function (DE) {
   'use strict';
 
-  const APP_URL = 'https://diagrams.trungctr.com/';
+  const APP_URL = 'https://design.trungctr.com/';
 
   // ------------------------------------------------- ví dụ hợp lệ cho từng mode
   // (được kiểm tra bằng DE.validateDocStrict trong test)
@@ -185,6 +185,7 @@
     L.push('| `sourceAnchor`, `targetAnchor` | tuỳ chọn | số 0..1 – vị trí dọc trên lifeline/activation (chỉ dùng cho sequence diagram) |');
     L.push('| `routing` | tuỳ chọn | "orthogonal" (vuông góc) \\| "straight" (thẳng) \\| "curved" (cong); bỏ trống = mặc định của type |');
     L.push('| `labelPos` | tuỳ chọn | số 0..1 – vị trí nhãn dọc theo đường (mặc định 0.5) |');
+    L.push('| `midX`, `midY` | tuỳ chọn | số – toạ độ đoạn giữa của đường vuông góc (`midX` khi đoạn giữa nằm dọc, `midY` khi nằm ngang); thường BỎ TRỐNG để app tự đặt ở giữa, chỉ dùng khi cần dời đường tránh hình khác |');
     L.push('| `style` | tuỳ chọn | `stroke`, `strokeWidth`, `dash`, `startArrow`, `endArrow`, `fontSize`, `textColor` – thường KHÔNG cần, type đã quy định ký hiệu chuẩn |');
     L.push('');
     L.push('## Quy tắc bắt buộc (app sẽ từ chối file sai)');
@@ -298,10 +299,12 @@
     L.push('## Chọn kiểu trả lời theo tab người dùng đang mở (ghi ở đầu mỗi tin nhắn)');
     L.push('- **Tab Tài liệu**: viết / sửa / bổ sung tài liệu (kể cả "vẽ thêm sơ đồ … vào tài liệu") → khối ````markdown đầy đủ.');
     L.push('- **Tab Diagram**: vẽ / sửa diagram → một khối ```json như SKILL diagram. Nếu người dùng yêu cầu viết tài liệu → khối ````markdown (app tự chuyển sang tab Tài liệu).');
+    L.push('- **Tab Thiết kế trang**: dựng / sửa trang web → một khối ```json có `"pages"` theo SKILL thiết kế trang (chỉ có trong hội thoại khi người dùng chat từ tab này).');
     L.push('- **Tab Hướng dẫn**: người dùng đang đọc hướng dẫn sử dụng – trả lời câu hỏi về cách dùng app bằng chữ, ngắn gọn, theo từng bước.');
     L.push('');
     L.push('## Cách dùng app (để trả lời câu hỏi của người dùng)');
-    L.push('- 3 tab trên cùng: Tài liệu (Alt+1), Diagram (Alt+2), Hướng dẫn (Alt+3). Khung chat AI có ở mọi tab.');
+    L.push('- 4 tab trên cùng: Tài liệu (Alt+1), Diagram (Alt+2), Thiết kế trang (Alt+3), Hướng dẫn (Alt+4). Khung chat AI có ở mọi tab.');
+    L.push('- Thiết kế trang: kéo thành phần (khối trang, hàng, cột, nút, ảnh, menu, bảng, biểu mẫu, mẫu dựng sẵn) từ thư viện bên trái vào trang; nhấn đúp để sửa chữ; bảng Thuộc tính bên phải chia nhóm (Định dạng, Loại nút, Hiệu ứng khi di chuột qua / khi bấm…); tab Lớp để sắp xếp; Máy tính / Máy tính bảng / Điện thoại để xem từng cỡ màn hình; "▶ Xem thử" để chạy thử; tải HTML (mọi trang trong một file) hoặc JSON.');
     L.push('- Tài liệu: gõ trực tiếp như Word, thanh công cụ định dạng; "◆ Diagram mới" mở tab Diagram để vẽ rồi "✓ Chèn vào tài liệu"; rê chuột lên diagram → "✎ Sửa" (hoặc nhấn đúp). Mở / lưu file .md bằng Ctrl+O / Ctrl+S hoặc kéo thả file vào cửa sổ. File .md lưu diagram dạng SVG + JSON. Nút "</> Developer" hiện mã Markdown.');
     L.push('- Diagram: chọn chế độ Flowchart / BPMN / UML; kéo hình từ thư viện bên trái; rê chuột lên hình rồi kéo từ chấm xanh để nối; nhấn đúp để sửa chữ; bảng Thuộc tính bên phải; tab JSON để sửa dữ liệu; tải JSON / SVG / PNG.');
     L.push('- Chat AI: bấm chip API key để chọn nhà cung cấp (có gói miễn phí: Google Gemini, OpenRouter, Groq…), Ctrl+Enter để gửi, Ctrl+M để nói.');

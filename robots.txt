@@ -1,5 +1,5 @@
 User-agent: *
 Allow: /
 
-# Mô tả dành cho các hệ thống AI / LLM: https://diagrams.trungctr.com/llms.txt
-Sitemap: https://diagrams.trungctr.com/sitemap.xml
+# Mô tả dành cho các hệ thống AI / LLM: https://design.trungctr.com/llms.txt
+Sitemap: https://design.trungctr.com/sitemap.xml

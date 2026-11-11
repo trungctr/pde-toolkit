@@ -143,33 +143,56 @@
     return out;
   }
 
-  function ortho(p1, p2) {
+  const userNum = (v) => typeof v === 'number' && isFinite(v);
+
+  /**
+   * Định tuyến vuông góc. ov = { midX, midY }: vị trí đoạn giữa do người dùng kéo (tuỳ chọn).
+   *  - midX dùng khi đoạn giữa nằm DỌC (kéo sang trái / phải), midY khi nằm NGANG (kéo lên / xuống).
+   *  - Giá trị bị giới hạn để đoạn giữa không vượt qua phần ra / vào của hai hình (mũi tên không
+   *    đâm ngược xuyên hình); trường hợp đi vòng ra ngoài thì không giới hạn.
+   * Trả về { pts, mid }: mid = { axis: 'x' | 'y', a, b } – hai đầu đoạn giữa kéo được (null nếu
+   * đường chỉ có góc chữ L hoặc đoạn giữa dài 0).
+   */
+  function ortho(p1, p2, ov = {}) {
     const G = 24;
     const d1 = p1.dir, d2 = p2.dir;
     const s = { x: p1.x + d1[0] * G, y: p1.y + d1[1] * G };
     const t = { x: p2.x + d2[0] * G, y: p2.y + d2[1] * G };
     const mid = [];
+    let axis = null;
+    const between = (v, a, b, def) => (userNum(v) ? DE.clamp(v, Math.min(a, b), Math.max(a, b)) : def);
+    const beyond = (v, ext, sign, def) => (userNum(v) ? (sign > 0 ? Math.max(v, ext) : Math.min(v, ext)) : def);
+    const free = (v, def) => (userNum(v) ? v : def);
     const h1 = d1[0] !== 0, h2 = d2[0] !== 0;
     if (h1 && h2) {
+      axis = 'x';
       if (d1[0] === -d2[0] && (t.x - s.x) * d1[0] >= 0) {
-        const mx = (s.x + t.x) / 2;
+        // hai đầu đối diện (→ ←): chữ Z, đoạn giữa dọc nằm giữa hai hình
+        const mx = between(ov.midX, s.x, t.x, (s.x + t.x) / 2);
         mid.push({ x: mx, y: s.y }, { x: mx, y: t.y });
       } else if (d1[0] === d2[0]) {
-        const x = d1[0] > 0 ? Math.max(s.x, t.x) : Math.min(s.x, t.x);
+        // cùng hướng (→ →): chữ U, đoạn giữa dọc nằm ngoài cùng
+        const ext = d1[0] > 0 ? Math.max(s.x, t.x) : Math.min(s.x, t.x);
+        const x = beyond(ov.midX, ext, d1[0], ext);
         mid.push({ x, y: s.y }, { x, y: t.y });
       } else {
-        const my = (s.y + t.y) / 2;
+        // quay lưng nhau (← →): đi vòng, đoạn giữa ngang
+        axis = 'y';
+        const my = free(ov.midY, (s.y + t.y) / 2);
         mid.push({ x: s.x, y: my }, { x: t.x, y: my });
       }
     } else if (!h1 && !h2) {
+      axis = 'y';
       if (d1[1] === -d2[1] && (t.y - s.y) * d1[1] >= 0) {
-        const my = (s.y + t.y) / 2;
+        const my = between(ov.midY, s.y, t.y, (s.y + t.y) / 2);
         mid.push({ x: s.x, y: my }, { x: t.x, y: my });
       } else if (d1[1] === d2[1]) {
-        const y = d1[1] > 0 ? Math.max(s.y, t.y) : Math.min(s.y, t.y);
+        const ext = d1[1] > 0 ? Math.max(s.y, t.y) : Math.min(s.y, t.y);
+        const y = beyond(ov.midY, ext, d1[1], ext);
         mid.push({ x: s.x, y }, { x: t.x, y });
       } else {
-        const mx = (s.x + t.x) / 2;
+        axis = 'x';
+        const mx = free(ov.midX, (s.x + t.x) / 2);
         mid.push({ x: mx, y: s.y }, { x: mx, y: t.y });
       }
     } else if (h1) {
@@ -179,14 +202,17 @@
       if ((t.y - s.y) * d1[1] >= 0 && (s.x - t.x) * d2[0] >= 0) mid.push({ x: s.x, y: t.y });
       else mid.push({ x: t.x, y: s.y });
     }
-    return simplify([p1, s, ...mid, t, p2]);
+    const pts = simplify([p1, s, ...mid, t, p2]);
+    const seg = axis && mid.length === 2 && Math.hypot(mid[1].x - mid[0].x, mid[1].y - mid[0].y) >= 2 ? { axis, a: mid[0], b: mid[1] } : null;
+    return { pts, mid: seg };
   }
 
-  /** Hình học của một edge: { pts, curve? } */
+  /** Hình học của một edge: { pts, curve?, mid? } – mid: đoạn giữa kéo được (đường vuông góc) */
   DE.edgeGeom = function (e, nodes) {
     const sn = nodes.get(e.source), tn = nodes.get(e.target);
     if (!sn || !tn) return null;
     const routing = DE.edgeRouting(e);
+    const ov = { midX: e.midX, midY: e.midY };
     if (sn === tn && e.sourceAnchor == null) {
       const p1 = DE.portPoint(sn, DIRS[e.sourcePort] ? e.sourcePort : 'right');
       const p2 = DE.portPoint(sn, DIRS[e.targetPort] ? e.targetPort : 'top');
@@ -194,7 +220,7 @@
         const m = 30;
         return { pts: [p1, { x: p1.x + m, y: p1.y }, { x: p1.x + m, y: p2.y - m }, { x: p2.x, y: p2.y - m }, p2] };
       }
-      return { pts: ortho(p1, p2) };
+      return ortho(p1, p2, ov);
     }
     const p1 = DE.resolveEnd(sn, e.sourcePort, e.sourceAnchor, DE.refPoint(tn, e.targetAnchor));
     const p2 = DE.resolveEnd(tn, e.targetPort, e.targetAnchor, DE.refPoint(sn, e.sourceAnchor));
@@ -206,7 +232,7 @@
         curve: [p1, { x: p1.x + p1.dir[0] * L, y: p1.y + p1.dir[1] * L }, { x: p2.x + p2.dir[0] * L, y: p2.y + p2.dir[1] * L }, p2],
       };
     }
-    return { pts: ortho(p1, p2) };
+    return ortho(p1, p2, ov);
   };
 
   // ============================================================= PATH UTILS

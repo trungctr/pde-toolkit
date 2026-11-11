@@ -234,6 +234,19 @@
       const r = 6 / z;
       out.push(`<circle class="end-handle" data-end="source" data-edge="${esc(e.id)}" cx="${f(a.x)}" cy="${f(a.y)}" r="${f(r)}" stroke-width="${f(1.5 / z)}"/>`);
       out.push(`<circle class="end-handle" data-end="target" data-edge="${esc(e.id)}" cx="${f(b.x)}" cy="${f(b.y)}" r="${f(r)}" stroke-width="${f(1.5 / z)}"/>`);
+      // đoạn giữa của đường vuông góc: kéo để dời (cả trên đoạn lẫn tay nắm), nhấn đúp tay nắm -> tự động
+      if (g.mid) {
+        const m = g.mid, vert = m.axis === 'x'; // đoạn dọc -> kéo ngang
+        const cls = vert ? 'mid-x' : 'mid-y';
+        const custom = typeof e[vert ? 'midX' : 'midY'] === 'number';
+        const cx = (m.a.x + m.b.x) / 2, cy = (m.a.y + m.b.y) / 2;
+        const L = 20 / z, T = 8 / z, w = vert ? T : L, h = vert ? L : T;
+        out.push(`<line class="mid-hit ${cls}" data-mid="${m.axis}" data-edge="${esc(e.id)}" x1="${f(m.a.x)}" y1="${f(m.a.y)}" x2="${f(m.b.x)}" y2="${f(m.b.y)}" stroke-width="${f(12 / z)}"/>`);
+        out.push(
+          `<rect class="mid-handle ${cls}${custom ? ' custom' : ''}" data-mid="${m.axis}" data-edge="${esc(e.id)}" x="${f(cx - w / 2)}" y="${f(cy - h / 2)}" width="${f(w)}" height="${f(h)}" rx="${f(T / 2)}" stroke-width="${f(1.5 / z)}">` +
+            `<title>Kéo để dời đoạn giữa${custom ? ' · nhấn đúp: về vị trí tự động' : ''}</title></rect>`
+        );
+      }
     }
     // các node đang chọn
     const sn = doc.nodes.filter((n) => sel.has(n.id));
@@ -327,6 +340,9 @@
     e[end] = nodeId;
     delete e[end + 'Port'];
     delete e[end + 'Anchor'];
+    // nối lại -> đường đi mới, đoạn giữa về tự động
+    delete e.midX;
+    delete e.midY;
     if (anchor != null) e[end + 'Anchor'] = +(+anchor).toFixed(4);
     else if (DE.DIRS[port]) e[end + 'Port'] = port;
   }
@@ -352,13 +368,21 @@
     }
     if (ev.button !== 0) return;
 
-    const t = ev.target.closest('[data-handle],[data-port],[data-end],[data-kind]');
-    const kind = !t ? null : t.dataset.handle ? 'handle' : t.dataset.port ? 'port' : t.dataset.end ? 'end' : t.dataset.kind;
+    const t = ev.target.closest('[data-handle],[data-port],[data-end],[data-mid],[data-kind]');
+    const kind = !t ? null : t.dataset.handle ? 'handle' : t.dataset.port ? 'port' : t.dataset.end ? 'end' : t.dataset.mid ? 'mid' : t.dataset.kind;
 
     if (dbl) {
       drag = null;
       if (kind === 'node' || kind === 'edge') E.editText(t.dataset.id);
+      else if (kind === 'mid' && t.classList.contains('mid-handle')) E.resetMid([t.dataset.edge]);
+      else if (kind === 'mid') E.editText(t.dataset.edge); // nhấn đúp lên đoạn giữa: sửa nhãn như bình thường
       else if (!kind) startNewText(p);
+      return;
+    }
+
+    if (kind === 'mid') {
+      drag = { type: 'mid', edge: t.dataset.edge, axis: t.dataset.mid, s: p, moved: false };
+      store.begin();
       return;
     }
 
@@ -433,7 +457,11 @@
       });
     }
     const orig = new Map([...ids].map((id) => [id, { x: map.get(id).x, y: map.get(id).y }]));
-    drag = { type: 'move', s: p, orig, moved: false, lead: E.selectedNodes()[0].id };
+    // đường nối có cả hai đầu cùng di chuyển: đoạn giữa đã chỉnh tay dịch theo
+    const mids = store.doc.edges
+      .filter((e) => ids.has(e.source) && ids.has(e.target) && (typeof e.midX === 'number' || typeof e.midY === 'number'))
+      .map((e) => ({ e, midX: e.midX, midY: e.midY }));
+    drag = { type: 'move', s: p, orig, mids, moved: false, lead: E.selectedNodes()[0].id };
     store.begin();
   }
 
@@ -470,6 +498,23 @@
             n.y = oo.y + dy;
           }
         }
+        for (const m of drag.mids) {
+          if (typeof m.midX === 'number') m.e.midX = m.midX + dx;
+          if (typeof m.midY === 'number') m.e.midY = m.midY + dy;
+        }
+        store.touch();
+        break;
+      }
+      case 'mid': {
+        if (!drag.moved && Math.hypot(p.x - drag.s.x, p.y - drag.s.y) * view.z < 3) return;
+        drag.moved = true;
+        const e = edgeById(drag.edge);
+        if (!e) break;
+        const k = drag.axis === 'x' ? 'midX' : 'midY';
+        e[k] = snapV(p[drag.axis]);
+        // lưu đúng vị trí đang hiển thị (router giới hạn để đoạn giữa không vượt qua hai hình)
+        const g = DE.edgeGeom(e, map);
+        if (g && g.mid && g.mid.axis === drag.axis) e[k] = Math.round(g.mid.a[drag.axis] * 100) / 100;
         store.touch();
         break;
       }
@@ -541,6 +586,7 @@
     switch (d.type) {
       case 'move':
       case 'resize':
+      case 'mid':
         store.end();
         break;
       case 'connect':
@@ -794,6 +840,8 @@
       c.id = DE.uid('e');
       c.source = s;
       c.target = t;
+      if (typeof c.midX === 'number') c.midX += off;
+      if (typeof c.midY === 'number') c.midY += off;
       edges.push(c);
     });
     if (!nodes.length) return false;
@@ -939,17 +987,34 @@
   };
 
   function nudge(dx, dy) {
-    const ids = E.selectedNodes().map((n) => n.id);
-    if (!ids.length) return;
+    const ids = new Set(E.selectedNodes().map((n) => n.id));
+    if (!ids.size) return;
     store.mutate((doc) => {
       for (const n of doc.nodes) {
-        if (ids.includes(n.id)) {
+        if (ids.has(n.id)) {
           n.x += dx;
           n.y += dy;
         }
       }
+      for (const e of doc.edges) {
+        if (!ids.has(e.source) || !ids.has(e.target)) continue;
+        if (typeof e.midX === 'number') e.midX += dx;
+        if (typeof e.midY === 'number') e.midY += dy;
+      }
     }, 'nudge');
   }
+
+  /** Đưa đoạn giữa của các đường nối về vị trí tự động */
+  E.resetMid = function (ids) {
+    const set = new Set(ids);
+    store.mutate((doc) => {
+      for (const e of doc.edges) {
+        if (!set.has(e.id)) continue;
+        delete e.midX;
+        delete e.midY;
+      }
+    });
+  };
 
   // =========================================================== TEXT EDIT
   E.editText = function (id) {
@@ -1105,9 +1170,11 @@
         break;
       case 'Escape':
         if (drag) {
-          if (drag.type === 'move' || drag.type === 'resize') {
+          if (drag.type === 'move' || drag.type === 'resize' || drag.type === 'mid') {
+            // chỉ hoàn tác khi thao tác đang kéo đã thay đổi gì đó (không lỡ hoàn tác bước trước)
+            const changed = store._pending != null && store._pending !== JSON.stringify(store.doc);
             store.end();
-            store.undo();
+            if (changed) store.undo();
           }
           drag = null;
           invalidate(false);

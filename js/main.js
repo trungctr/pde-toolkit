@@ -30,6 +30,7 @@
     DE.store.load(initial, { history: false });
     DE.editor.init(document.getElementById('stage'));
     DE.ui.init();
+    if (DE.pages) DE.pages.init(); // trước docs.init: docs có thể mở lại tab Thiết kế trang ngay khi tải
     DE.docs.init();
     DE.store.onChange(autosave);
     requestAnimationFrame(() => DE.editor.fit());
@@ -53,6 +54,9 @@
       shapes: () => Object.keys(DE.shapes),
       /** tài liệu Markdown: diagram.markdown() trả về nội dung file .md hiện tại */
       markdown: () => DE.docs.serialize(),
+      /** thiết kế trang: diagram.pages() – dự án JSON; diagram.pageHTML() – file HTML xuất ra */
+      pages: () => DE.pages.project(),
+      pageHTML: () => DE.pages.html(),
       connectors: () => Object.keys(DE.connectors),
     };
   }

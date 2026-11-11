@@ -1276,24 +1276,31 @@
   const CHAT_PLACEHOLDER = {
     doc: 'Nhờ AI viết / sửa tài liệu này…',
     diagram: 'Hỏi AI về diagram này…',
+    design: 'Nhờ AI dựng / sửa trang web này…',
     guide: 'Hỏi AI cách sử dụng công cụ…',
   };
 
-  /** Chuyển tab: 'doc' (Tài liệu) | 'diagram' | 'guide' (Hướng dẫn) */
+  const WS_ORDER = ['doc', 'diagram', 'design', 'guide'];
+  /** Chuyển tab: 'doc' (Tài liệu) | 'diagram' | 'design' (Thiết kế trang) | 'guide' (Hướng dẫn) */
   function show(name) {
-    if (!['doc', 'diagram', 'guide'].includes(name)) return;
+    if (!WS_ORDER.includes(name)) return;
     const was = ws;
     ws = name;
     const doc = name === 'doc';
     const other = name !== 'diagram'; // whiteboard bị che
     if (other) E.commitText && E.commitText();
     if (!doc) flushVisual();
+    if (was === 'design' && name !== 'design' && DE.pages) DE.pages.onHide();
     document.body.classList.toggle('ws-doc', doc);
     document.body.classList.toggle('ws-guide', name === 'guide');
+    document.body.classList.toggle('ws-design', name === 'design');
     document.body.classList.toggle('ws-nodiagram', other);
     docview.hidden = !doc;
     $('#guideview').hidden = name !== 'guide';
+    const dv = $('#designview');
+    if (dv) dv.hidden = name !== 'design';
     if (name === 'guide' && DE.guide) DE.guide.render();
+    if (name === 'design' && DE.pages) DE.pages.onShow();
     ['#toolbar', '#stage', '#statusbar'].forEach((q) => ($(q).inert = other));
     ['#palette', '#inspector'].forEach((q) => {
       const el = $(q);
@@ -1399,6 +1406,7 @@
     $('#doc-dirty').hidden = !state.dirty;
     if (ws === 'doc') document.title = (state.dirty ? '● ' : '') + name + ' – Diagram Editor';
     else if (ws === 'guide') document.title = 'Hướng dẫn sử dụng – Diagram Editor';
+    else if (ws === 'design') document.title = DE.pages ? DE.pages.title() : 'Thiết kế trang – Diagram Editor';
     else document.title = (store.doc.meta?.name ? store.doc.meta.name + ' – ' : '') + 'Diagram Editor (BPMN, UML, Flowchart)';
   }
 
@@ -1483,8 +1491,8 @@
     $('#ws-tabs').addEventListener('keydown', (e) => {
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
-        const order = ['doc', 'diagram', 'guide'];
-        show(order[(order.indexOf(ws) + (e.key === 'ArrowRight' ? 1 : 2)) % 3]);
+        const n = WS_ORDER.length;
+        show(WS_ORDER[(WS_ORDER.indexOf(ws) + (e.key === 'ArrowRight' ? 1 : n - 1)) % n]);
         $('#ws-tabs .ws-tab.active').focus();
       }
     });
@@ -1649,7 +1657,7 @@
     updateSessionUI();
     renderPreview();
     const savedWs = lsGet(WS_KEY);
-    show(resumed ? 'diagram' : ['doc', 'guide'].includes(savedWs) ? savedWs : 'diagram');
+    show(resumed ? 'diagram' : ['doc', 'design', 'guide'].includes(savedWs) ? savedWs : 'diagram');
     if (resumed) setTimeout(() => toast('Tiếp tục phiên vẽ diagram cho tài liệu – bấm ✓ để đưa vào tài liệu, hoặc Huỷ', 'info'), 400);
     store.onChange(() => ws === 'diagram' && updateTitles());
   };
@@ -1793,7 +1801,7 @@
   DOCS.contextForAI = function () {
     flushVisual();
     if (ws === 'guide') return '[Tab hiện tại: Hướng dẫn sử dụng]';
-    if (ws !== 'doc') return null; // tab Diagram: ui.js tự gửi kèm JSON diagram
+    if (ws !== 'doc') return null; // tab Diagram / Thiết kế trang: ui.js tự gửi kèm dữ liệu của tab
     const text = ta.value;
     let s = `[Tab hiện tại: Tài liệu – file "${state.name}"]\n`;
     if (!text.trim()) return s + 'Tài liệu đang trống. Nếu người dùng yêu cầu viết tài liệu, trả về khối ````markdown đầy đủ.';
@@ -1814,7 +1822,8 @@
   // Thả file ở bất kỳ đâu trong cửa sổ:
   //   .md / .markdown / .txt  -> mở ở tab Tài liệu
   //   .json (diagram)         -> tab Tài liệu: nhúng vào tài liệu · tab Diagram: mở diagram
-  //   ảnh                     -> tab Tài liệu: chèn ảnh tại chỗ thả
+  //   .json (dự án trang)     -> tab Thiết kế trang: mở dự án
+  //   ảnh                     -> tab Tài liệu: chèn ảnh tại chỗ thả · tab Thiết kế trang: thêm thành phần Ảnh
   const isMdFile = (f) => /\.(md|markdown|mdx|txt)$/i.test(f.name);
   const isJsonFile = (f) => /\.json$/i.test(f.name);
   const isImgFile = (f) => /^image\//.test(f.type);
@@ -1834,7 +1843,9 @@
       msg.innerHTML =
         ws === 'doc'
           ? '<b>Thả file vào đây</b><span>.md – mở để chỉnh sửa · .json – nhúng diagram · ảnh – chèn vào tài liệu</span>'
-          : '<b>Thả file vào đây</b><span>.md – mở ở tab Tài liệu · .json – mở diagram</span>';
+          : ws === 'design'
+            ? '<b>Thả file vào đây</b><span>.json – mở dự án thiết kế trang · ảnh – thêm vào trang tại chỗ thả · .md – mở ở tab Tài liệu</span>'
+            : '<b>Thả file vào đây</b><span>.md – mở ở tab Tài liệu · .json – mở diagram</span>';
       ov.hidden = false;
     });
     window.addEventListener('dragleave', (e) => {
@@ -1859,10 +1870,12 @@
       }
       const json = files.find(isJsonFile);
       if (json) {
+        if (ws === 'design' && DE.pages) return DE.pages.openFile(json);
         if (ws === 'doc') return insertDiagramFile(json);
         return DE.ui.openDiagramFile(json);
       }
       const imgs = files.filter(isImgFile);
+      if (imgs.length && ws === 'design' && DE.pages) return DE.pages.insertImageFiles(imgs, e);
       if (imgs.length && ws === 'doc') {
         if (view === 'code') setView('split');
         // đặt con trỏ tại điểm thả
@@ -1875,7 +1888,7 @@
         }
         return imgs.forEach(insertImageFile);
       }
-      toast(`Không mở được "${files[0] ? files[0].name : 'file'}": chỉ nhận file .md, .json (diagram)` + (ws === 'doc' ? ' hoặc ảnh' : ''), 'warn');
+      toast(`Không mở được "${files[0] ? files[0].name : 'file'}": chỉ nhận file .md, .json` + (ws === 'doc' || ws === 'design' ? ' hoặc ảnh' : ''), 'warn');
     });
   }
 
@@ -1901,11 +1914,11 @@
 
   function onGlobalKey(e) {
     if (document.querySelector('.modal-backdrop')) return;
-    if (e.altKey && !e.ctrlKey && !e.metaKey && ['1', '2', '3'].includes(e.key)) {
+    if (e.altKey && !e.ctrlKey && !e.metaKey && ['1', '2', '3', '4'].includes(e.key)) {
       e.preventDefault();
-      return show({ 1: 'doc', 2: 'diagram', 3: 'guide' }[e.key]);
+      return show(WS_ORDER[+e.key - 1]);
     }
-    if (ws === 'diagram') return; // tab Hướng dẫn: Ctrl+S / Ctrl+O vẫn thao tác trên tài liệu
+    if (ws === 'diagram' || ws === 'design') return; // tab Hướng dẫn: Ctrl+S / Ctrl+O vẫn thao tác trên tài liệu
     const mod = e.ctrlKey || e.metaKey;
     if (!mod || e.altKey) return;
     const k = e.key.toLowerCase();

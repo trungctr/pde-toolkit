@@ -243,11 +243,15 @@
     }
     // Skill tài liệu + skill diagram của CẢ 3 chế độ, đặt MỘT lần cho cả cuộc trò chuyện: chat dùng
     // được ở mọi tab (Tài liệu / Diagram / Hướng dẫn), chuyển tab giữa chừng hội thoại vẫn tiếp tục.
-    if (!chat.system) {
-      chat.system = DE.buildDocSkill ? DE.buildDocSkill({ withDiagram: true }) : DE.buildSkillPrompt({ modes: Object.keys(DE.MODES) });
-      chat.history = [];
-    }
     const where = DE.docs ? DE.docs.current() : 'diagram';
+    // tab Thiết kế trang: thêm skill trang vào system (giữ nguyên lịch sử nếu đang trò chuyện dở)
+    const wantPage = where === 'design' && !!DE.buildPageSkill;
+    if (!chat.system || (wantPage && !chat.hasPage)) {
+      const base = DE.buildDocSkill ? DE.buildDocSkill({ withDiagram: true }) : DE.buildSkillPrompt({ modes: Object.keys(DE.MODES) });
+      if (!chat.system) chat.history = [];
+      chat.system = wantPage ? base + '\n\n---\n\n' + DE.buildPageSkill() : base;
+      chat.hasPage = wantPage;
+    }
     const hasDoc = !docIsEmpty();
     let ctx;
     if (where === 'diagram') {
@@ -258,7 +262,8 @@
             JSON.stringify(store.doc) +
             '\n```'
           : 'Whiteboard đang trống.');
-    } else ctx = DE.docs.contextForAI();
+    } else if (where === 'design' && DE.pages) ctx = DE.pages.contextForAI();
+    else ctx = DE.docs.contextForAI();
     const userMsg = text + '\n\n---\n' + ctx;
     const messages = [...chat.history.slice(-HISTORY_MAX), { role: 'user', content: userMsg }];
     showReply(null);
@@ -286,6 +291,40 @@
     const ta = $('#ai-prompt');
     ta.value = '';
     ta.dispatchEvent(new Event('input'));
+    // ---- tab Thiết kế trang: khối ```json có "pages" -> thay dự án trang, có nút hoàn tác
+    if (where === 'design' && DE.pages) {
+      const r = DE.pages.applyAIText(res.text || '');
+      if (r && r.ok) {
+        chat.history.push({ role: 'user', content: text }, { role: 'assistant', content: (explain || 'Đã dựng trang.') + '\n[Đã trả dự án đầy đủ – app đã áp dụng]' });
+        updateTurns();
+        const fixParts = [r.removed.length ? `bỏ ${r.removed.length} phần không hợp lệ` : '', r.fixed.length ? `sửa ${r.fixed.length} giá trị` : ''].filter(Boolean).join(', ');
+        showReply(
+          (explain || 'Đã cập nhật trang theo yêu cầu.') +
+            (fixParts ? `\n\n(App đã tự ${fixParts}.)` : '') +
+            (res.truncated ? '\n\n⚠ Câu trả lời có thể bị cắt do quá dài.' : '') +
+            notes,
+          'ok',
+          `Xong · ${r.pages} trang, ${r.count} thành phần`,
+          [
+            {
+              label: '↶ Hoàn tác thay đổi của AI',
+              fn: () => {
+                if (DE.pages.undoAI()) {
+                  showReply('Đã khôi phục dự án như trước khi AI sửa.', '', 'Đã hoàn tác');
+                  UI.toast('Đã hoàn tác thay đổi của AI', 'ok');
+                }
+              },
+            },
+          ]
+        );
+        UI.toast('✓ Đã áp dụng trang từ AI – không ưng thì bấm “Hoàn tác” trong khung chat hoặc Ctrl+Z', 'ok');
+        return { status: 'applied', text: explain };
+      }
+      if (r && !r.ok) {
+        showReply('AI trả về dữ liệu trang nhưng không đọc được: ' + r.error, 'err', 'Lỗi');
+        return { status: 'error', message: r.error };
+      }
+    }
     // ---- tài liệu Markdown (khối ````markdown) -> thay nội dung tab Tài liệu, có nút hoàn tác
     const md = DE.docs ? DE.docs.extractMarkdown(res.text || '') : null;
     if (md) {
@@ -402,9 +441,11 @@
   function skillDialog() {
     const hasDoc = !docIsEmpty();
     const mdText = DE.docs ? DE.docs.text() : '';
-    // mở từ tab Tài liệu / Hướng dẫn -> mặc định skill tài liệu
-    if (DE.docs && DE.docs.current() !== 'diagram') skillScope = 'doc';
-    else if (skillScope === 'doc') skillScope = 'mode';
+    // mở từ tab Tài liệu / Hướng dẫn -> mặc định skill tài liệu · tab Thiết kế trang -> skill trang
+    const tabNow = DE.docs ? DE.docs.current() : 'diagram';
+    if (tabNow === 'design' && DE.buildPageSkill) skillScope = 'page';
+    else if (tabNow !== 'diagram') skillScope = 'doc';
+    else if (skillScope === 'doc' || skillScope === 'page') skillScope = 'mode';
     const back = document.createElement('div');
     back.className = 'modal-backdrop';
     back.innerHTML =
@@ -421,6 +462,11 @@
       `<li>Sao chép <b>toàn bộ</b> câu trả lời của AI.</li>` +
       `<li>Mở tab <b>Tài liệu</b>, đặt con trỏ ở chỗ muốn chèn rồi dán (Ctrl+V) – nội dung được định dạng sẵn, các diagram trong câu trả lời thành diagram sửa được.</li>` +
       `</ol>` +
+      `<ol class="skill-steps" data-for="page">` +
+      `<li>Sao chép skill rồi dán vào ô chat của AI, viết yêu cầu ngay sau đó (vd: <i>“Dựng trang giới thiệu cho tiệm bánh, có menu và form đặt hàng”</i>).</li>` +
+      `<li>Lưu khối <code>json</code> AI trả về thành file <code>.json</code>.</li>` +
+      `<li>Mở tab <b>Thiết kế trang</b> → kéo thả file vào cửa sổ (hoặc nút Mở), hoặc dán vào tab <b>JSON</b> bên phải rồi bấm Áp dụng.</li>` +
+      `</ol>` +
       `<div class="embed-opts">` +
       `<label class="embed-opt"><input type="radio" name="skill-scope" value="mode"${skillScope === 'mode' ? ' checked' : ''}>` +
       `<div><b>Chỉ chế độ ${esc(modeDef().name)}</b><span>Ngắn gọn, AI tập trung đúng loại diagram bạn đang vẽ.</span></div></label>` +
@@ -428,7 +474,12 @@
       `<div><b>Cả 3 chế độ</b><span>Flowchart, BPMN và UML/ERD – dài hơn, dùng khi chưa biết sẽ vẽ loại nào.</span></div></label>` +
       `<label class="embed-opt"><input type="radio" name="skill-scope" value="doc"${skillScope === 'doc' ? ' checked' : ''}>` +
       `<div><b>Tài liệu Markdown</b><span>Viết / sửa tài liệu (đặc tả, thiết kế, hướng dẫn…) có nhúng diagram – gồm cả skill diagram.</span></div></label>` +
+      (DE.buildPageSkill
+        ? `<label class="embed-opt"><input type="radio" name="skill-scope" value="page"${skillScope === 'page' ? ' checked' : ''}>` +
+          `<div><b>Thiết kế trang</b><span>Dựng / sửa trang web (hàng, cột, nút, menu, bảng, biểu mẫu) cho tab Thiết kế trang.</span></div></label>`
+        : '') +
       `</div>` +
+      (DE.pages ? `<label class="chk embed-sel" data-for="page"><input type="checkbox" id="skill-page"> Kèm dự án trang hiện tại để AI sửa tiếp</label>` : '') +
       (mdText.trim() ? `<label class="chk embed-sel" data-for="doc"><input type="checkbox" id="skill-md"> Kèm tài liệu hiện tại (${mdText.length.toLocaleString('vi-VN')} ký tự) để AI sửa tiếp</label>` : '') +
       (hasDoc ? `<label class="chk embed-sel" data-for="diagram"><input type="checkbox" id="skill-doc"> Kèm diagram hiện tại (${store.doc.nodes.length} hình, ${store.doc.edges.length} đường nối) để AI chỉnh sửa tiếp</label>` : '') +
       `<textarea class="code embed-code skill-code" readonly spellcheck="false" aria-label="Nội dung skill prompt"></textarea>` +
@@ -438,14 +489,16 @@
     const info = back.querySelector('.embed-info');
     const copyBtn = back.querySelector('[data-r="copy"]');
     const build = () =>
-      skillScope === 'doc'
+      skillScope === 'page'
+        ? DE.buildPageSkill({ proj: back.querySelector('#skill-page')?.checked ? DE.pages.project() : null })
+        : skillScope === 'doc'
         ? DE.buildDocSkill({ withDiagram: true, text: back.querySelector('#skill-md')?.checked ? mdText : null })
         : DE.buildSkillPrompt({
             modes: skillScope === 'all' ? Object.keys(DE.MODES) : [mode],
             doc: back.querySelector('#skill-doc')?.checked ? store.doc : null,
           });
     const update = () => {
-      const kind = skillScope === 'doc' ? 'doc' : 'diagram';
+      const kind = skillScope === 'doc' || skillScope === 'page' ? skillScope : 'diagram';
       back.querySelectorAll('[data-for]').forEach((el) => (el.hidden = el.dataset.for !== kind));
       ta.value = build();
       const chars = ta.value.length;
@@ -471,7 +524,7 @@
       if ((b && b.dataset.r === 'close') || e.target === back) return close();
       if (!b) return;
       if (b.dataset.r === 'download') {
-        DE.download(`diagram-editor-skill-${skillScope === 'doc' ? 'tai-lieu' : skillScope === 'all' ? 'all' : mode}.md`, new Blob([ta.value], { type: 'text/markdown' }));
+        DE.download(`diagram-editor-skill-${skillScope === 'doc' ? 'tai-lieu' : skillScope === 'page' ? 'thiet-ke-trang' : skillScope === 'all' ? 'all' : mode}.md`, new Blob([ta.value], { type: 'text/markdown' }));
         UI.toast('Đã tải file skill (.md) – mở file, sao chép nội dung và dán vào AI khi cần', 'ok');
       } else if (b.dataset.r === 'copy') {
         if (await copyText(ta.value, ta)) {
@@ -1739,6 +1792,12 @@
       h += field('Vị trí nhãn', `<input type="range" data-f="labelPos" min="0" max="1" step="0.05" value="${e.labelPos ?? 0.5}">`);
     }
     h += field('Định tuyến', selectIn('routing', DE.edgeRouting(e), [['orthogonal', 'Vuông góc (orthogonal)'], ['straight', 'Thẳng'], ['curved', 'Cong']]));
+    if (edges.some((x) => DE.edgeRouting(x) === 'orthogonal')) {
+      const custom = edges.some((x) => typeof x.midX === 'number' || typeof x.midY === 'number');
+      h += custom
+        ? `<div class="btn-row mid-row"><span class="hint">Đoạn giữa: đã chỉnh tay</span><button class="btn" data-act="reset-mid" title="Đưa đoạn giữa về vị trí tự động (hoặc nhấn đúp tay nắm trên đường)">↺ Về tự động</button></div>`
+        : `<p class="hint mid-row">Kéo tay nắm ở giữa đường (hoặc chính đoạn giữa) để dời đoạn giữa.</p>`;
+    }
     h += `<h4>Mũi tên</h4><div class="grid2">${field('Đầu (source)', selectIn('style.startArrow', s.startArrow, DE.ARROWS))}${field('Cuối (target)', selectIn('style.endArrow', s.endArrow, DE.ARROWS))}</div>`;
     if (single) {
       h += `<div class="grid2">${field('Cổng nguồn', selectIn('sourcePort', e.sourceAnchor != null ? 'auto' : e.sourcePort || 'auto', PORT_OPTS))}${field('Cổng đích', selectIn('targetPort', e.targetAnchor != null ? 'auto' : e.targetPort || 'auto', PORT_OPTS))}</div>`;
@@ -1821,6 +1880,10 @@
     else if (act === 'front') E.bringToFront();
     else if (act === 'back') E.sendToBack();
     else if (act === 'reverse') E.reverseEdges(target.ids);
+    else if (act === 'reset-mid') {
+      E.resetMid(target.ids);
+      renderProps();
+    }
     else if (act === 'reset-style') {
       const ids = new Set(target.ids);
       store.mutate((doc) => {

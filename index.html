@@ -15,14 +15,14 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
   <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#161b22">
-  <link rel="canonical" href="https://diagrams.trungctr.com/">
-  <link rel="sitemap" type="application/xml" href="https://diagrams.trungctr.com/sitemap.xml">
-  <meta property="og:url" content="https://diagrams.trungctr.com/">
-  <meta property="og:image" content="https://diagrams.trungctr.com/og-image.png">
+  <link rel="canonical" href="https://design.trungctr.com/">
+  <link rel="sitemap" type="application/xml" href="https://design.trungctr.com/sitemap.xml">
+  <meta property="og:url" content="https://design.trungctr.com/">
+  <meta property="og:image" content="https://design.trungctr.com/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="Giao diện Diagram Editor đang vẽ một quy trình BPMN">
-  <meta name="twitter:image" content="https://diagrams.trungctr.com/og-image.png">
+  <meta name="twitter:image" content="https://design.trungctr.com/og-image.png">
 
   <!-- Open Graph / mạng xã hội -->
   <meta property="og:type" content="website">
@@ -35,17 +35,17 @@
   <meta name="twitter:description" content="Vẽ BPMN 2.0, UML 2.5, Flowchart và ERD ngay trên trình duyệt. JSON, SVG, PNG và nhúng SVG vào Markdown.">
 
   <!-- AI / LLM: mô tả có cấu trúc cho máy đọc -->
-  <link rel="alternate" type="text/plain" href="https://diagrams.trungctr.com/llms.txt" title="LLM-friendly description">
+  <link rel="alternate" type="text/plain" href="https://design.trungctr.com/llms.txt" title="LLM-friendly description">
   <link rel="help" href="README.md">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "WebApplication",
     "name": "Diagram Editor",
-    "url": "https://diagrams.trungctr.com/",
-    "image": "https://diagrams.trungctr.com/og-image.png",
-    "screenshot": "https://diagrams.trungctr.com/og-image.png",
-    "codeRepository": "https://github.com/trungctr/dev_docs_toolkit",
+    "url": "https://design.trungctr.com/",
+    "image": "https://design.trungctr.com/og-image.png",
+    "screenshot": "https://design.trungctr.com/og-image.png",
+    "codeRepository": "https://github.com/trungctr/pde-toolkit",
     "alternateName": ["Trình vẽ diagram BPMN UML Flowchart", "Whiteboard diagram editor"],
     "description": "Công cụ vẽ diagram dạng whiteboard dành cho thiết kế phần mềm: BPMN 2.0, UML 2.5, Flowchart và ERD. Đối tượng được quản lý bằng JSON; xuất SVG, PNG; nhúng SVG trực tiếp vào Markdown.",
     "applicationCategory": "DesignApplication",
@@ -66,6 +66,7 @@
       "Chat AI vẽ diagram từ mô tả bằng lời: Gemini, OpenRouter (miễn phí), Groq, Cerebras, Mistral, Hugging Face, Ollama, LM Studio, OpenAI, Claude",
       "Nhập bằng giọng nói, lệnh giọng nói, phản hồi bằng giọng nói; nhận dạng offline bằng Moonshine",
       "Soạn và xem tài liệu Markdown (.md), nhúng diagram vào tài liệu và sửa lại bất cứ lúc nào",
+      "Thiết kế trang web bằng kéo thả: hàng, cột, nút bấm, menu, bảng, biểu mẫu; xem theo máy tính / máy tính bảng / điện thoại; xuất HTML",
       "Chạy offline, không cần cài đặt, không cần tài khoản"
     ],
     "keywords": "BPMN, UML, flowchart, ERD, diagram, whiteboard, ISO/IEC/IEEE 12207, JSON, SVG, Markdown",
@@ -121,12 +122,16 @@
         <span class="logo" aria-hidden="true">◆</span>
         <span class="ws-label">Diagram</span><span class="ws-badge" id="ws-dg-badge" hidden>mới</span>
       </button>
-      <button type="button" class="ws-tab" data-ws="guide" role="tab" aria-controls="guideview" title="Hướng dẫn sử dụng bộ công cụ (Alt+3)">
+      <button type="button" class="ws-tab" data-ws="design" role="tab" aria-controls="designview" title="Thiết kế trang web bằng kéo thả (Alt+3)">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 9v11M11 13h6M11 16h4"/></svg>
+        <span class="ws-label">Thiết kế trang</span><span class="ws-title" id="ws-pg-title"></span><span class="ws-dot" id="ws-pg-dot" title="Có thay đổi chưa tải xuống file JSON" hidden>●</span>
+      </button>
+      <button type="button" class="ws-tab" data-ws="guide" role="tab" aria-controls="guideview" title="Hướng dẫn sử dụng bộ công cụ (Alt+4)">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21a9 9 0 100-18 9 9 0 000 18zM9.5 9a2.5 2.5 0 015 .5c0 1.5-2.5 2-2.5 3.5M12 17h.01"/></svg>
         <span class="ws-label">Hướng dẫn</span>
       </button>
       <span class="ws-spacer"></span>
-      <span class="ws-hint">Alt+1 Tài liệu · Alt+2 Diagram · Alt+3 Hướng dẫn</span>
+      <span class="ws-hint">Alt+1 Tài liệu · Alt+2 Diagram · Alt+3 Thiết kế trang · Alt+4 Hướng dẫn</span>
     </nav>
 
     <!-- ============================== TOOLBAR ============================== -->
@@ -305,6 +310,83 @@
       </footer>
     </section>
 
+    <!-- =========================== THIẾT KẾ TRANG =========================== -->
+    <section id="designview" class="designview" hidden role="tabpanel" aria-label="Thiết kế trang web">
+      <div class="doc-toolbar pg-toolbar" role="toolbar" aria-label="Công cụ thiết kế trang">
+        <div class="tb-group">
+          <button data-pg="new" data-icon="new" title="Dự án mới (trống hoặc mẫu)"></button>
+          <button data-pg="open" data-icon="open" title="Mở dự án .json (Ctrl+O)"></button>
+          <button data-pg="save" data-icon="save" title="Tải dự án .json (Ctrl+S)"></button>
+          <input id="pg-name" class="doc-name" type="text" spellcheck="false" autocomplete="off" title="Tên dự án (dùng làm tên file và tiêu đề trang web)" aria-label="Tên dự án">
+        </div>
+        <div class="tb-group">
+          <button data-pg="undo" data-icon="undo" title="Hoàn tác (Ctrl+Z)"></button>
+          <button data-pg="redo" data-icon="redo" title="Làm lại (Ctrl+Y)"></button>
+        </div>
+        <div class="tb-group" role="group" aria-label="Thành phần đang chọn">
+          <button data-pg="parent" title="Chọn khung chứa bên ngoài (Esc)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5M4 9h10a6 6 0 016 6v5"/></svg></button>
+          <button data-pg="up" title="Đưa lên trước (Alt+↑)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+          <button data-pg="down" title="Đưa xuống sau (Alt+↓)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg></button>
+          <button data-pg="duplicate" data-icon="duplicate" title="Nhân bản (Ctrl+D)"></button>
+          <button data-pg="delete" data-icon="trash" title="Xoá (Delete)"></button>
+        </div>
+        <div class="mode-switch pg-devices" role="group" aria-label="Xem trên thiết bị">
+          <button data-device="desktop" title="Xem trên máy tính"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg><span>Máy tính</span></button>
+          <button data-device="tablet" title="Xem trên máy tính bảng (768px)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M11 18h2"/></svg><span>Máy tính bảng</span></button>
+          <button data-device="phone" title="Xem trên điện thoại (390px)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg><span>Điện thoại</span></button>
+        </div>
+        <div class="tb-group">
+          <button data-pg="outline" title="Hiện đường viền của mọi khung bố cục"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-dasharray="3 2.5" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 10h18M12 10v10"/></svg></button>
+        </div>
+        <div class="tb-spacer"></div>
+        <div class="tb-group">
+          <button data-pg="preview" class="text-btn pg-preview-btn" title="Xem thử: bấm nút, mở menu, chuyển trang như trang thật"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>Xem thử</button>
+        </div>
+        <div class="tb-group last download-group">
+          <span class="tb-label">Tải xuống</span>
+          <button data-pg="export-html" class="text-btn dl-html" title="Xuất trang web HTML hoàn chỉnh (mọi trang trong một file)">HTML</button>
+          <button data-pg="save" class="text-btn dl-md" title="Tải file dự án .json để mở lại và sửa tiếp">JSON</button>
+        </div>
+      </div>
+      <div class="pg-body">
+        <aside class="pg-left" aria-label="Thành phần và lớp">
+          <div class="tabs" role="tablist">
+            <button class="tab" data-ptab="parts" role="tab">Thành phần</button>
+            <button class="tab" data-ptab="layers" role="tab">Lớp</button>
+          </div>
+          <div id="pg-parts" class="pg-parts">
+            <div class="pal-search"><input id="pg-parts-search" type="search" placeholder="Tìm thành phần… (nút, menu, bảng…)" autocomplete="off"></div>
+            <div id="pg-parts-list" class="pg-parts-list"></div>
+            <p class="pg-parts-hint">Kéo vào trang, hoặc bấm để thêm vào chỗ đang chọn</p>
+          </div>
+          <div id="pg-layers" class="pg-layers" hidden></div>
+        </aside>
+        <div class="pg-center">
+          <div id="pg-pages" class="pg-pages" role="tablist" aria-label="Các trang"></div>
+          <div id="pg-canvas" class="pg-canvas">
+            <div id="pg-stage" class="pg-stage">
+              <iframe id="pg-frame" title="Khung thiết kế trang" sandbox="allow-same-origin" tabindex="-1"></iframe>
+              <div id="pg-overlay" class="pg-overlay"></div>
+            </div>
+          </div>
+        </div>
+        <aside class="pg-right" aria-label="Thuộc tính">
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-itab="props" role="tab" aria-selected="true">Thuộc tính</button>
+            <button class="tab" data-itab="json" role="tab" aria-selected="false">JSON</button>
+          </div>
+          <div id="pg-insp-head" class="pg-insp-head"></div>
+          <div id="pg-props" class="pg-props"></div>
+        </aside>
+      </div>
+      <footer class="doc-status pg-status">
+        <span id="pg-st-page"></span>
+        <span id="pg-st-dev"></span>
+        <span id="pg-st-sel"></span>
+        <span class="st-hint">Kéo thả từ bên trái · Nhấn đúp để sửa chữ · Delete xoá · Ctrl+D nhân bản · Esc chọn khung ngoài</span>
+      </footer>
+    </section>
+
     <!-- ========================= HƯỚNG DẪN SỬ DỤNG ========================= -->
     <section id="guideview" class="guideview" hidden role="tabpanel" aria-label="Hướng dẫn sử dụng">
       <aside class="guide-toc">
@@ -393,6 +475,7 @@
   <input type="file" id="file-input" accept=".json,application/json" hidden>
   <div id="drop-overlay" class="drop-overlay" hidden><div id="drop-overlay-msg" class="drop-msg"></div></div>
   <input type="file" id="md-file-input" accept=".md,.markdown,.mdx,.txt,text/markdown,text/plain" hidden>
+  <input type="file" id="pg-file-input" accept=".json,application/json" hidden>
 
   <script src="js/util.js"></script>
   <script src="js/shapes.js"></script>
@@ -409,6 +492,8 @@
   <script src="js/markdown.js"></script>
   <script src="js/docs.js"></script>
   <script src="js/guide.js"></script>
+  <script src="js/page-kit.js"></script>
+  <script src="js/page-editor.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

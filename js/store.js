@@ -7,7 +7,7 @@
  *   "meta":  { "name": "..." },
  *   "nodes": [ { id, type, x, y, w, h, text, style:{...} }, ... ],
  *   "edges": [ { id, type, source, target, label, sourcePort?, targetPort?,
- *                sourceAnchor?, targetAnchor?, routing?, labelPos?, style:{...} } ]
+ *                sourceAnchor?, targetAnchor?, routing?, labelPos?, midX?, midY?, style:{...} } ]
  * }
  * ========================================================================= */
 (function (DE) {
@@ -149,6 +149,18 @@
           delete out[k];
         }
       });
+      // vị trí đoạn giữa của đường vuông góc (người dùng kéo) – toạ độ x / y
+      ['midX', 'midY'].forEach((k) => {
+        if (out[k] == null) return delete out[k];
+        const v = num(out[k], NaN);
+        if (!isFinite(v)) {
+          fixed.push(`${at}: "${k}" = ${show(e[k])} → bỏ (tự động)`);
+          delete out[k];
+        } else if (typeof e[k] !== 'number') {
+          fixed.push(`${at}: "${k}" = ${show(e[k])} → ${v}`);
+          out[k] = v;
+        }
+      });
       if (out.routing != null && !['orthogonal', 'straight', 'curved'].includes(out.routing)) {
         fixed.push(`${at}: "routing" = ${show(e.routing)} → mặc định của kiểu đường nối`);
         delete out.routing;
@@ -208,6 +220,9 @@
       });
       ['sourceAnchor', 'targetAnchor', 'labelPos'].forEach((k) => {
         if (e[k] !== undefined && !(isNum(e[k]) && e[k] >= 0 && e[k] <= 1)) errs.push(`${at}: "${k}" phải là số trong khoảng 0..1.`);
+      });
+      ['midX', 'midY'].forEach((k) => {
+        if (e[k] !== undefined && !isNum(e[k])) errs.push(`${at}: "${k}" phải là số (toạ độ đoạn giữa).`);
       });
       if (e.routing !== undefined && !['orthogonal', 'straight', 'curved'].includes(e.routing)) errs.push(`${at}: "routing" chỉ nhận orthogonal / straight / curved.`);
       if (e.label !== undefined && typeof e.label !== 'string') errs.push(`${at}: "label" phải là chuỗi.`);

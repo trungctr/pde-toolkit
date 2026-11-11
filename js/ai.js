@@ -69,7 +69,7 @@
       keyHint: 'sk-or-…',
       listNeedsKey: false,
       note: 'Có mô hình miễn phí (🆓, đuôi “:free”); “openrouter/free” tự chọn một mô hình miễn phí. Key miễn phí, giới hạn số lượt mỗi ngày.',
-      headers: () => ({ 'HTTP-Referer': /^https?:/.test(location.origin) ? location.origin : 'https://diagrams.trungctr.com', 'X-Title': 'Diagram Editor' }),
+      headers: () => ({ 'HTTP-Referer': /^https?:/.test(location.origin) ? location.origin : 'https://design.trungctr.com', 'X-Title': 'Diagram Editor' }),
       suggested: ['openrouter/free', 'google/gemma-4-31b-it:free', 'nvidia/nemotron-3-ultra-550b-a55b:free'],
       async listModels(key, base) {
         const res = await net(this, base, `${base}/models`, {});

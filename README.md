@@ -2,15 +2,17 @@
 
 Trình vẽ diagram dạng whiteboard chạy hoàn toàn trên trình duyệt: **Flowchart, BPMN 2.0, UML 2.5 và ERD**.
 HTML + CSS + JavaScript thuần, không cần build, không phụ thuộc thư viện ngoài. Mọi đối tượng được quản lý
-bằng **JSON**, và có **Chat AI** – gõ hoặc **nói** – để mô tả bằng lời rồi để AI vẽ giúp.
+bằng **JSON**, và có **Chat AI** – gõ hoặc **nói** – để mô tả bằng lời rồi để AI vẽ giúp. Kèm theo là tab soạn
+**tài liệu Markdown** (nhúng diagram) và tab **thiết kế trang web bằng kéo thả** (xuất file HTML).
 
-**Dùng ngay:** <https://diagrams.trungctr.com/> (cài được như ứng dụng, chạy cả khi offline).
+**Dùng ngay:** <https://design.trungctr.com/> (cài được như ứng dụng, chạy cả khi offline).
 
 ## Mục lục
 
 - [Chạy trên máy](#chạy-trên-máy)
 - [Tính năng](#tính-năng)
 - [Tài liệu Markdown](#tài-liệu-markdown)
+- [Thiết kế trang](#thiết-kế-trang)
 - [Chat AI](#chat-ai)
 - [Giọng nói](#giọng-nói)
 - [Phím tắt](#phím-tắt)
@@ -47,6 +49,8 @@ mới hoạt động.
 - Canvas vô hạn, zoom / pan, lưới và bắt dính lưới, chọn nhiều bằng vùng chọn, căn chỉnh và dàn đều, nhân bản,
   copy / paste (dữ liệu JSON, dùng được giữa các tab), undo / redo.
 - **Nối nhanh**: rê chuột lên hình, kéo từ chấm xanh; thả ra vùng trống để tạo nhanh một hình đã nối sẵn.
+- **Dời đoạn giữa**: chọn đường nối vuông góc dạng chữ Z / U, kéo tay nắm ở giữa (hoặc chính đoạn giữa) để dời đoạn
+  giữa sang trái / phải hoặc lên / xuống; nhấn đúp tay nắm (hay bấm “↺ Về tự động” ở bảng Thuộc tính) để về vị trí tự động.
 - **Sequence diagram**: message gắn tự do theo trục dọc lifeline / activation, tự bắt thẳng hàng ngang.
 - **Container** (Pool, Lane, Package, Frame, Group…): kéo container sẽ kéo theo các hình bên trong.
 - **Thu gọn panel**: nút ‹ › ở mép canvas hoặc `Ctrl+B` / `Ctrl+Alt+B`; diagram đứng yên khi panel co giãn.
@@ -79,8 +83,9 @@ offline nhờ service worker (network-first), mở file `.json` trực tiếp t�
 
 ## Tài liệu Markdown
 
-App có ba tab ở trên cùng: **Tài liệu** (soạn / xem file `.md`, `Alt+1`), **Diagram** (whiteboard, `Alt+2`) và
-**Hướng dẫn** (hướng dẫn sử dụng có mục lục, tìm kiếm và ví dụ gửi thẳng vào chat AI, `Alt+3`). Diagram luôn được
+App có bốn tab ở trên cùng: **Tài liệu** (soạn / xem file `.md`, `Alt+1`), **Diagram** (whiteboard, `Alt+2`),
+**Thiết kế trang** (dựng trang web bằng kéo thả, `Alt+3`) và **Hướng dẫn** (hướng dẫn sử dụng có mục lục, tìm kiếm và
+ví dụ gửi thẳng vào chat AI, `Alt+4`). Diagram luôn được
 vẽ ở tab Diagram rồi nhúng vào tài liệu; muốn sửa thì mở lại diagram đó ở tab Diagram.
 
 Thanh công cụ chia theo nhóm; khi màn hình hẹp, các nhóm tự xuống hàng – không nút nào bị ẩn.
@@ -145,18 +150,109 @@ Trong **file `.md` tải xuống / lưu ra**, mỗi diagram là một khối t�
 - JSON được escape `<` `>` thành `\u003c` `\u003e` nên không bao giờ làm vỡ comment HTML.
 - GitHub lọc bỏ SVG inline (giống tính năng Nhúng SVG).
 
+## Thiết kế trang
+
+Tab **Thiết kế trang** dựng trang web bằng **kéo thả** cho người không biết code – ý tưởng gần với Figma nhưng thao tác
+đơn giản hơn: thay vì vẽ từng hình, người dùng xếp các **thành phần dựng sẵn** vào trang, trang tự co giãn theo màn hình.
+
+```text
+[ Mới Mở Lưu  Tên dự án ] [ ↶ ↷ ] [ ⤴ ↑ ↓ ⧉ 🗑 ] [ Máy tính | Máy tính bảng | Điện thoại ] [ ▦ ]   [ ▶ Xem thử ] [ HTML JSON ]
+┌ Thành phần | Lớp ┐ [ ⌂ Trang chủ ] [ Giới thiệu ] [ ＋ Trang ]  ┌ Thuộc tính | JSON ──────────┐
+│ BỐ CỤC           │ ┌──────────────────────────────────────┐   │ Trang chủ › Khối trang › Hàng │
+│ Khối  Hàng  Cột  │ │ Studio Xanh        Trang chủ  Liên hệ │   │ ▸ NỘI DUNG                    │
+│ NỘI DUNG         │ │   ╭ Nút bấm: Liên hệ ⤴ ✥ ↑ ↓ ⧉ 🗑 ╮   │   │ ▾ ĐỊNH DẠNG                   │
+│ Tiêu đề  Nút …   │ │   [ Liên hệ ngay → ] [ Về chúng tôi ] │   │ ▾ LOẠI NÚT – KHI BẤM          │
+│ ĐIỀU HƯỚNG …     │ └──────────────────────────────────────┘   │ ▸ HIỆU ỨNG KHI DI CHUỘT QUA … │
+└──────────────────┘                                            └───────────────────────────────┘
+```
+
+- **Bên trái**: thư viện thành phần (kéo vào trang hoặc bấm để thêm cạnh thành phần đang chọn) và tab **Lớp** (cây thành
+  phần – chọn, kéo đổi chỗ / đổi khung chứa, đặt tên).
+- **Giữa**: trang nằm trong một `iframe` có `sandbox` (không chạy script) để CSS của trang không lẫn với app và media query
+  chạy đúng theo bề rộng thiết bị (máy tính · 768px · 390px). Một lớp phủ trong suốt nhận thao tác: chọn, rê, kéo thả
+  (vạch xanh lá cho biết vị trí thả), **nhấn đúp để sửa chữ ngay trên trang** (tiêu đề, đoạn văn, nút, mục danh sách,
+  ô bảng – `Tab` sang ô kế). Nhiều trang trong một dự án (tab phía trên; trang mới chép sẵn phần đầu và chân trang).
+- **Bên phải**: thuộc tính chia nhóm, **đặt tên theo cách nói thông thường** thay vì tên CSS – “Khi di chuột qua” thay cho
+  `:hover`, “Đệm trong” thay cho `padding`, “Bo góc”, “Đổ bóng”, “Độ rõ”…; mỗi giá trị đã đổi có nút ↺ về mặc định.
+  Không chọn gì: thiết lập trang (tên, đường dẫn, nền) và dự án (font chung, cỡ chữ, màu chữ, màu chủ đạo, mã JavaScript).
+
+### Thành phần
+
+| Nhóm | Thành phần | Ghi chú |
+| --- | --- | --- |
+| Bố cục | Khối trang (`section`), Hàng (`row`), Cột (`col`), Thẻ | Khối trang render ra thẻ ngữ nghĩa (`header`, `nav`, `main`, `section`, `article`, `aside`, `footer`) và căn giữa nội dung theo “bề rộng phần nội dung”; Hàng = flex row (tự xuống dòng, **xếp chồng trên điện thoại**); Cột = flex column, độ rộng chia đều / vừa nội dung / % / px |
+| Nội dung | Tiêu đề (H1–H6), Đoạn văn, Nút bấm, Ảnh, Danh sách | Ảnh: URL, tải từ máy (tự thu nhỏ ≤ 1600px) hoặc kéo thả file vào trang |
+| Điều hướng | Menu bảng nhỏ, Menu toàn trang, Nút mở menu ☰ | Menu chỉ hiện khi bấm nút loại “Mở menu”; trong khung soạn menu thu thành một dải mỏng, mở ra khi được chọn |
+| Biểu mẫu | Biểu mẫu, Ô nhập (chữ, email, số điện thoại, số, mật khẩu, ngày, nhiều dòng), Hộp chọn, Ô đánh dấu, Nút gửi | Khi gửi: hiện lời cảm ơn, gửi tới URL (POST/GET) hoặc gọi hàm JavaScript |
+| Dữ liệu | Bảng | Dòng tiêu đề, kẻ ô / kẻ ngang, tô xen kẽ, tô sáng hàng khi di chuột qua, dán từ Excel |
+| Ngăn cách | Thanh ngang, Thanh dọc, Khoảng trống | |
+| Mẫu dựng sẵn | Thanh điều hướng (kèm menu ☰ cho điện thoại), Ảnh bìa, 3 tính năng, Bảng giá, Biểu mẫu liên hệ, Chân trang | |
+
+**Nút bấm** có ba nhóm thuộc tính chính:
+
+- **Định dạng**: kiểu nhanh (nền đặc / viền / nền nhạt / chỉ chữ), kích thước, màu nền, màu chữ, viền, font, cỡ chữ,
+  đậm / nghiêng / gạch chân / IN HOA, giãn cách chữ, căn chữ, độ rộng (vừa chữ / giãn hết / cố định), vị trí trong khung,
+  đệm trong, bo góc, đổ bóng.
+- **Loại nút – khi bấm** (chọn một): **Chuyển trang** (trang trong dự án hoặc địa chỉ web, mở tab mới) · **Mở menu**
+  (chọn hoặc tạo menu) · **Gửi / chạy chức năng** (gửi biểu mẫu chứa nút, hiện thông báo, gọi hàm JavaScript).
+- **Hiệu ứng khi di chuột qua / khi bấm**: tích từng thay đổi – màu nền (có “Tự động” đậm hơn nền), màu chữ, màu viền,
+  phóng to / thu nhỏ, nhấc lên / lún xuống, đổ bóng, độ rõ – và tốc độ chuyển. Dòng “Xem trước” bật trạng thái đó ngay
+  trên khung soạn. Các khung (hàng, cột, thẻ…), ảnh và chữ cũng có nhóm hiệu ứng này.
+
+**Menu**: loại bảng nhỏ (dưới nút căn trái / phải, hoặc trên nút; độ rộng) hoặc toàn trang (nút đóng ×, vị trí các mục,
+hiệu ứng hiện dần / trượt xuống / trượt từ phải); nền (màu, ảnh nền, làm tối ảnh), bo góc, viền, bóng, xếp mục dọc / ngang,
+đóng khi bấm ra ngoài / khi chọn một mục.
+
+Mọi thành phần có nhóm **Hiển thị**: độ rõ, **ẩn trên điện thoại**, **ẩn trên máy tính & máy tính bảng** (điểm ngắt 640px).
+
+### Xem thử, xuất file, dữ liệu
+
+- **▶ Xem thử**: chạy trang trong `iframe sandbox="allow-scripts …"` **không** có `allow-same-origin` – mã của trang
+  (kể cả “Mã JavaScript của dự án”) chạy ở origin riêng, không đọc được API key hay dữ liệu của app.
+- **Tải xuống HTML**: một file `.html` độc lập chứa mọi trang (`<div data-page="duong-dan">`), CSS sinh từ thuộc tính và
+  một đoạn JS nhỏ: chuyển trang theo `#/duong-dan`, mở / đóng menu (đặt menu bảng nhỏ cạnh nút, `aria-expanded`,
+  `Esc` để đóng), gửi biểu mẫu. Font web (Be Vietnam Pro, Inter, Roboto…) chỉ được nạp khi được chọn.
+- **Tải xuống JSON** / mở lại / kéo thả file `.json` vào cửa sổ. Dự án tự lưu vào `localStorage`.
+- Dữ liệu dự án:
+
+```json
+{
+  "kind": "de-page", "version": 1, "name": "Studio Xanh",
+  "theme": { "font": "system", "fontSize": 16, "color": "#0f172a", "primary": "#2563eb" },
+  "pages": [
+    { "id": "p_home", "name": "Trang chủ", "path": "index", "props": { "bg": "#ffffff" },
+      "children": [
+        { "id": "hero", "type": "section", "props": { "bg": "#eff6ff", "padY": 96, "align": "center" },
+          "children": [
+            { "id": "t1", "type": "heading", "props": { "text": "Xin chào", "level": "1" } },
+            { "id": "b1", "type": "button", "props": { "text": "Liên hệ", "action": "link", "page": "p_contact", "hoverLift": 2 } }
+          ] }
+      ] }
+  ],
+  "script": ""
+}
+```
+
+`props` chỉ chứa giá trị khác mặc định. Khi mở file / áp dụng JSON / nhận từ AI, `DE.pagekit.normalize` kiểm tra từng
+thuộc tính theo kiểu (màu, số có giới hạn, danh sách cố định, URL chỉ `http(s)` / `mailto` / `tel` / tương đối, ảnh thêm
+`data:image/…;base64`) và bỏ phần không hợp lệ – nên dữ liệu lạ không chèn được mã vào HTML / CSS sinh ra. Tham chiếu
+trang / menu nhận cả id, đường dẫn hoặc tên rồi đổi về id.
+
 ## Chat AI
 
-Khung chat nổi ở góc dưới phải, **có ở cả ba tab** (thu nhỏ được thành nút “Chat AI”). AI biết bạn đang ở tab nào:
+Khung chat nổi ở góc dưới phải, **có ở mọi tab** (thu nhỏ được thành nút “Chat AI”). AI biết bạn đang ở tab nào:
 
 | Tab | AI làm gì | Hoàn tác |
 | --- | --- | --- |
 | Tài liệu | Viết / sửa **toàn bộ tài liệu** (khối ````` ````markdown `````), tự vẽ diagram và chèn vào đúng chỗ (khối ```` ```diagram ````), sửa diagram đã nhúng (`"embedId"`) | Nút **↶ Hoàn tác thay đổi của AI** trong khung chat |
 | Diagram | Vẽ / sửa diagram (JSON) – như trước; yêu cầu viết tài liệu thì chuyển sang tab Tài liệu | `Ctrl+Z` |
+| Thiết kế trang | Dựng / sửa cả dự án trang web (khối ```` ```json ```` có `"pages"`); ảnh đã tải lên được thay bằng mã ngắn `@img:n` khi gửi và khôi phục khi nhận | Nút **↶ Hoàn tác thay đổi của AI**, hoặc `Ctrl+Z` |
 | Hướng dẫn | Trả lời câu hỏi về cách dùng app | – |
 
-System prompt gồm **skill tài liệu** (`DE.buildDocSkill` trong `js/skill.js`) + skill diagram của cả 3 chế độ. Mỗi tin
-nhắn gửi kèm ngữ cảnh tab: tài liệu hiện tại (diagram dạng dòng `[[diagram:…]]` + JSON của chúng) hoặc diagram đang mở.
+System prompt gồm **skill tài liệu** (`DE.buildDocSkill` trong `js/skill.js`) + skill diagram của cả 3 chế độ; khi chat
+từ tab Thiết kế trang, **skill thiết kế trang** (`DE.buildPageSkill` trong `js/page-kit.js`, sinh tự động từ danh mục thành
+phần) được thêm vào mà không xoá lịch sử. Mỗi tin nhắn gửi kèm ngữ cảnh tab: tài liệu hiện tại (diagram dạng dòng
+`[[diagram:…]]` + JSON của chúng), diagram đang mở, hoặc dự án trang đang mở.
 
 ```text
 [ Claude ● ] [ Copy context ] [ mô hình ▾ ] [ Effort: … ▾ ] [ 💡 Thinking: bật ]      Lượt 2  ↻  —
@@ -196,9 +292,9 @@ phần suy luận `<think>…</think>` vào câu trả lời thì app tự bỏ 
 Ollama (form Cài đặt AI hiện sẵn lệnh với đúng địa chỉ trang):
 
 ```text
-Windows:  setx OLLAMA_ORIGINS "https://diagrams.trungctr.com"
-macOS:    launchctl setenv OLLAMA_ORIGINS "https://diagrams.trungctr.com"
-Linux:    systemctl edit ollama  →  [Service] Environment="OLLAMA_ORIGINS=https://diagrams.trungctr.com"
+Windows:  setx OLLAMA_ORIGINS "https://design.trungctr.com"
+macOS:    launchctl setenv OLLAMA_ORIGINS "https://design.trungctr.com"
+Linux:    systemctl edit ollama  →  [Service] Environment="OLLAMA_ORIGINS=https://design.trungctr.com"
 ```
 
 Chrome / Edge có thể hỏi quyền truy cập thiết bị trong mạng cục bộ – chọn Cho phép. Safari chặn trang `https`
@@ -342,8 +438,9 @@ Thời gian & ngôn ngữ → Giọng nói → Thêm giọng → Tiếng Việt 
 | Thu gọn / mở panel | `Ctrl+B` (thư viện) / `Ctrl+Alt+B` (thuộc tính) |
 | Gửi prompt cho AI | `Ctrl+Enter` trong ô chat |
 | Nói với AI | `Ctrl+M` (nói xong tự gửi) · `Ctrl+Shift+M` rảnh tay · `Esc` huỷ khi đang nghe |
-| Chuyển tab Tài liệu / Diagram / Hướng dẫn | `Alt+1` / `Alt+2` / `Alt+3` |
+| Chuyển tab Tài liệu / Diagram / Thiết kế trang / Hướng dẫn | `Alt+1` / `Alt+2` / `Alt+3` / `Alt+4` |
 | Tab Tài liệu | `Ctrl+S` lưu · `Ctrl+Shift+S` lưu thành · `Ctrl+O` mở · `Ctrl+B` / `Ctrl+I` / `Ctrl+K` / `Ctrl+E` đậm / nghiêng / link / code |
+| Tab Thiết kế trang | Nhấn đúp / `Enter` / `F2` sửa chữ · `Esc` chọn khung chứa · `↑` `↓` thành phần trước / sau · `Alt+↑` / `Alt+↓` đổi thứ tự · `Ctrl+C` / `Ctrl+X` / `Ctrl+V` / `Ctrl+D` · `Delete` · `Ctrl+Z` / `Ctrl+Y` · `Ctrl+S` tải JSON · `Ctrl+O` mở |
 
 ## Cấu trúc JSON
 
@@ -385,6 +482,7 @@ Có thể thêm trường tuỳ ý (ví dụ `"data": {...}`); editor giữ nguy
 | `sourceAnchor`, `targetAnchor` | 0..1 – vị trí dọc trên lifeline / activation (sequence diagram) |
 | `routing` | `orthogonal` / `straight` / `curved` (mặc định theo kiểu đường nối) |
 | `label`, `labelPos` | Nhãn và vị trí nhãn dọc theo đường (0..1) |
+| `midX`, `midY` | Vị trí đoạn giữa của đường vuông góc do người dùng kéo (toạ độ x khi đoạn giữa nằm dọc, y khi nằm ngang); bỏ trống = tự động |
 | `style` | `stroke`, `strokeWidth`, `dash`, `startArrow`, `endArrow`, `fontSize`, `textColor` |
 
 Các kiểu mũi tên: `none`, `arrow`, `open`, `triangle`, `diamond`, `diamondFilled`, `circle`, `circleFilled`,
@@ -418,6 +516,8 @@ const a = diagram.add('uml.class', 100, 100, { text: 'User\n--\n- id: int' })
 const b = diagram.add('uml.class', 400, 100, { text: 'Admin' })
 diagram.connect('uml.generalization', b, a)
 diagram.markdown()                            // nội dung file .md của tab Tài liệu (diagram đã nhúng)
+diagram.pages()                               // dự án tab Thiết kế trang (JSON)
+diagram.pageHTML()                            // file HTML xuất ra từ dự án trang
 ```
 
 ## Cấu trúc mã nguồn
@@ -438,6 +538,8 @@ js/export.js           xuất SVG / PNG, nhúng Markdown
 js/markdown.js         render Markdown → HTML (CommonMark + GFM, không thư viện ngoài) + làm sạch HTML
 js/docs.js             tab Tài liệu: soạn / xem .md, mở / lưu file, nhúng & sửa diagram (phiên nhúng), áp dụng tài liệu từ AI
 js/guide.js            tab Hướng dẫn: nội dung hướng dẫn sử dụng (Markdown), mục lục, tìm kiếm, nút “Thử” ví dụ prompt
+js/page-kit.js         thiết kế trang – lõi: danh mục thành phần & thuộc tính, chuẩn hoá / lọc JSON, sinh HTML + CSS, file HTML xuất ra, skill AI
+js/page-editor.js      thiết kế trang – giao diện: khung iframe, kéo thả, sửa chữ trực tiếp, bảng thuộc tính, lớp, trang, xem thử
 js/editor.js           tương tác canvas (chọn, kéo, resize, nối, phím tắt)
 js/ui.js               toolbar, thư viện, bảng thuộc tính, tab JSON, trợ giúp, khung chat AI
 js/main.js             khởi động, tự lưu, PWA
@@ -465,10 +567,10 @@ trong `js/help.js` để hình xuất hiện trong tab Trợ giúp – skill pro
 ## Triển khai
 
 Trang chạy trên **GitHub Pages** (Deploy from a branch: `main`, thư mục `/`) với domain riêng
-`diagrams.trungctr.com`:
+`design.trungctr.com`:
 
 - File `CNAME` trong repo lưu custom domain của GitHub Pages – **không xoá**.
-- DNS (Cloudflare): bản ghi `CNAME diagrams → trungctr.github.io`, chế độ **DNS only**; bật **Enforce HTTPS**
+- DNS (Cloudflare): bản ghi `CNAME design → trungctr.github.io`, chế độ **DNS only**; bật **Enforce HTTPS**
   trong Settings → Pages.
 - Khi phát hành bản mới có thêm / bớt file: cập nhật `PRECACHE` và tăng `VERSION` trong `sw.js`; cập nhật
   `<lastmod>` trong `sitemap.xml` khi nội dung trang thay đổi.
