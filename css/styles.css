@@ -1305,8 +1305,6 @@ button.help-thumb:hover { border-color: var(--accent); background: var(--accent-
 .doc-toolbar .doc-rich .rich-ico.fn { font: 600 11px/1 Consolas, monospace; }
 .rich-modal { width: min(980px, 100%); max-height: min(92vh, 900px); }
 .rich-modal.rich-raw { width: min(720px, 100%); }
-.rich-tpl { flex-direction: row !important; align-items: center; gap: 10px !important; }
-.rich-tpl select { width: auto !important; flex: 1; }
 .rich-modes { display: flex; gap: 18px; margin: 0 0 8px; }
 .rich-edit { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-bottom: 6px; }
 .rich-raw .rich-edit { grid-template-columns: minmax(0, 1fr); }

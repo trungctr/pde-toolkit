@@ -200,7 +200,9 @@
     const job = mmQueue.then(async () => {
       const id = 'de-mmd-' + ++mmSeq;
       try {
-        const { svg } = await mm.render(id, src);
+        let { svg } = await mm.render(id, src);
+        // nhãn dạng chữ SVG (htmlLabels: false): Mermaid thoát ký tự hai lần ("&" hiện thành "&amp;") – bỏ lớp thừa
+        svg = svg.replace(/&amp;(amp|lt|gt|quot|apos|#\d+|#x[\da-f]+);/gi, '&$1;');
         const vb = svg.match(/viewBox="\s*[-\d.e]+[\s,]+[-\d.e]+[\s,]+([\d.e]+)[\s,]+([\d.e]+)\s*"/);
         const w = vb ? Math.max(1, Math.ceil(+vb[1])) : 600, h = vb ? Math.max(1, Math.ceil(+vb[2])) : 400;
         return { url: 'data:image/svg+xml;base64,' + b64(svg), w, h, svg };
@@ -221,9 +223,17 @@
   }
   R.renderMermaid = renderMermaid;
 
+  const WB_BTN = (attr) =>
+    `<button type="button" ${attr}="whiteboard" title="Chuyển thành diagram của ứng dụng để sửa kéo thả trên whiteboard (hoặc nhấn đúp)">◆ Sửa trên whiteboard</button>`;
   function paintMermaid(el, r, src, opts) {
+    // sửa = chuyển thành diagram của app; loại không có dạng tương ứng (Gantt, pie…) thì sửa mã
+    const C = DE.mermaidConv;
+    const kind = C ? C.kindOf(src) : '';
+    const name = C ? C.KIND_NAME[kind] || C.OTHER_NAME[kind] || '' : '';
+    const conv = !!(C && C.KIND_NAME[kind] && r.url);
     const acts = opts.editor
-      ? `<div class="dg-actions"><span class="dg-name">◇ Mermaid</span><button type="button" data-mma="edit" title="Sửa mã sơ đồ (hoặc nhấn đúp)">✎ Sửa</button>` +
+      ? `<div class="dg-actions"><span class="dg-name">◇ Mermaid${name ? ' · ' + esc(name) : ''}</span>` +
+        (conv ? WB_BTN('data-mma') : '<button type="button" data-mma="edit" title="Sửa mã sơ đồ (hoặc nhấn đúp)">✎ Sửa mã</button>') +
         (r.url ? '<button type="button" data-mma="svg" title="Tải ảnh SVG của sơ đồ">SVG</button>' : '') +
         '</div>'
       : '';
@@ -276,8 +286,7 @@
       const kindName = (DE.plantuml && DE.plantuml.KIND_NAME[r.kind]) || 'PlantUML';
       const acts = opts.editor
         ? `<div class="dg-actions"><span class="dg-name">◆ PlantUML · ${esc(kindName)}</span>` +
-          (r.ok ? '<button type="button" data-pua="whiteboard" title="Chuyển thành diagram kéo thả, sửa trên whiteboard">◆ Sửa trên whiteboard</button>' : '') +
-          '<button type="button" data-pua="edit" title="Sửa mã PlantUML (hoặc nhấn đúp)">✎ Mã</button>' +
+          (r.ok ? WB_BTN('data-pua') : '<button type="button" data-pua="edit" title="Sửa mã PlantUML (hoặc nhấn đúp)">✎ Sửa mã</button>') +
           (r.ok ? '<button type="button" data-pua="svg" title="Tải ảnh SVG">SVG</button>' : '') +
           '</div>'
         : '';
@@ -305,26 +314,11 @@
   };
 
   // ================================================================ HỘP THOẠI SỬA
-  const MERMAID_TPL = [
-    ['flowchart', 'Lưu đồ', 'flowchart TD\n  A[Bắt đầu] --> B{Hợp lệ?}\n  B -- Có --> C[Xử lý]\n  B -- Không --> D[Báo lỗi]\n  C --> E[Kết thúc]\n  D --> E'],
-    ['sequence', 'Tuần tự', 'sequenceDiagram\n  actor U as Người dùng\n  participant W as Web\n  participant S as Máy chủ\n  U->>W: Đăng nhập\n  W->>S: POST /login\n  S-->>W: Token\n  W-->>U: Vào trang chủ'],
-    ['gantt', 'Gantt (tiến độ)', 'gantt\n  title Kế hoạch dự án\n  dateFormat YYYY-MM-DD\n  section Phân tích\n    Thu thập yêu cầu :a1, 2026-01-05, 7d\n    Viết đặc tả      :after a1, 5d\n  section Phát triển\n    Lập trình        :b1, 2026-01-19, 14d\n    Kiểm thử         :after b1, 7d'],
-    ['pie', 'Biểu đồ tròn', 'pie title Nguồn truy cập\n  "Tìm kiếm" : 45\n  "Mạng xã hội" : 30\n  "Trực tiếp" : 25'],
-    ['mindmap', 'Sơ đồ tư duy', 'mindmap\n  root((Dự án))\n    Mục tiêu\n      Doanh thu\n      Người dùng\n    Nhóm\n      Thiết kế\n      Lập trình\n    Rủi ro'],
-    ['class', 'Lớp (class)', 'classDiagram\n  class User {\n    +String name\n    +login()\n  }\n  class Order {\n    +Date date\n    +total() float\n  }\n  User "1" --> "*" Order'],
-    ['state', 'Trạng thái', 'stateDiagram-v2\n  [*] --> Nhap\n  Nhap --> ChoDuyet : Gửi\n  ChoDuyet --> DaDuyet : Duyệt\n  ChoDuyet --> Nhap : Trả lại\n  DaDuyet --> [*]'],
-    ['er', 'Thực thể – quan hệ', 'erDiagram\n  CUSTOMER ||--o{ ORDER : "đặt"\n  ORDER ||--|{ ORDER_ITEM : "gồm"\n  PRODUCT ||--o{ ORDER_ITEM : "thuộc"'],
-    ['journey', 'Hành trình người dùng', 'journey\n  title Mua hàng online\n  section Tìm kiếm\n    Tìm sản phẩm: 4: Khách\n    So sánh giá: 3: Khách\n  section Thanh toán\n    Nhập địa chỉ: 2: Khách\n    Thanh toán: 4: Khách'],
-    ['timeline', 'Dòng thời gian', 'timeline\n  title Lịch sử sản phẩm\n  2024 : Ý tưởng\n  2025 : Bản thử nghiệm : 1.000 người dùng\n  2026 : Phát hành chính thức'],
-    ['git', 'Nhánh Git', 'gitGraph\n  commit\n  branch feature\n  checkout feature\n  commit\n  commit\n  checkout main\n  merge feature\n  commit'],
-    ['quadrant', 'Ma trận 4 ô', 'quadrantChart\n  title Ưu tiên công việc\n  x-axis Ít công sức --> Nhiều công sức\n  y-axis Ít giá trị --> Nhiều giá trị\n  quadrant-1 Lên kế hoạch\n  quadrant-2 Làm ngay\n  quadrant-3 Bỏ qua\n  quadrant-4 Giao việc\n  Tính năng A: [0.3, 0.8]\n  Tính năng B: [0.7, 0.6]'],
-  ];
-  R.MERMAID_TPL = MERMAID_TPL;
 
   /**
    * Hộp thoại sửa mã có xem trước.
-   * o.kind: 'mermaid' | 'math' | 'raw'; o.value; o.title; o.hint; o.ok;
-   * o.templates (mermaid: chọn mẫu); o.modes (math: chọn trong dòng / khối riêng); o.display (math: mặc định khối riêng).
+   * o.kind: 'mermaid' | 'plantuml' | 'math' | 'raw'; o.value; o.title; o.hint; o.ok;
+   * o.modes (math: chọn trong dòng / khối riêng); o.display (math: mặc định khối riêng).
    * Trả Promise<{ value, display } | null>
    */
   R.editDialog = function (o) {
@@ -332,10 +326,6 @@
       const kind = o.kind || 'raw';
       const back = document.createElement('div');
       back.className = 'modal-backdrop';
-      const tpl =
-        kind === 'mermaid' && o.templates
-          ? `<label class="f rich-tpl"><span>Bắt đầu từ mẫu</span><select data-rt="tpl"><option value="">— Chọn loại sơ đồ —</option>${MERMAID_TPL.map(([k, n]) => `<option value="${k}">${esc(n)}</option>`).join('')}</select></label>`
-          : '';
       const modes =
         kind === 'math' && o.modes
           ? `<div class="rich-modes" role="radiogroup"><label class="chk"><input type="radio" name="rt-mode" value="block"${o.display !== false ? ' checked' : ''}> Khối riêng (căn giữa)</label>` +
@@ -346,13 +336,13 @@
         (kind === 'plantuml'
           ? 'Cú pháp PlantUML: sequence, use case, class, activity, state, component / deployment, ER – vẽ ngay trong trình duyệt, không gửi lên máy chủ. Ctrl+Enter để áp dụng.'
           : kind === 'mermaid'
-          ? 'Cú pháp Mermaid: lưu đồ, tuần tự, Gantt, biểu đồ tròn, sơ đồ tư duy… – xem mermaid.js.org. Ctrl+Enter để áp dụng.'
+          ? 'Loại sơ đồ này (Gantt, biểu đồ tròn, sơ đồ tư duy…) không có dạng tương ứng trên whiteboard nên sửa bằng mã – xem mermaid.js.org. Ctrl+Enter để áp dụng.'
           : kind === 'math'
             ? 'Cú pháp LaTeX, ví dụ: \\frac{a}{b}, x^2, \\sqrt{x}, \\sum_{i=1}^{n} i, \\int_0^1 f(x)\\,dx. Ctrl+Enter để áp dụng.'
             : 'Ctrl+Enter để áp dụng.');
       back.innerHTML =
         `<div class="modal rich-modal${kind === 'raw' ? ' rich-raw' : ''}" role="dialog" aria-modal="true" aria-labelledby="rt-title">` +
-        `<h3 id="rt-title">${esc(o.title || 'Sửa')}</h3>${tpl}${modes}` +
+        `<h3 id="rt-title">${esc(o.title || 'Sửa')}</h3>${modes}` +
         `<div class="rich-edit"><textarea class="code" spellcheck="false" aria-label="Mã nguồn">${esc(o.value || '')}</textarea>` +
         (kind === 'raw' ? '' : '<div class="rich-preview" aria-live="polite"></div>') +
         `</div><p class="hint">${esc(hint)}</p>` +
@@ -423,13 +413,7 @@
       };
       ta.addEventListener('input', schedule);
       back.addEventListener('change', (e) => {
-        if (e.target.dataset.rt === 'tpl') {
-          const tp = MERMAID_TPL.find((x) => x[0] === e.target.value);
-          if (tp) {
-            ta.value = tp[2];
-            preview();
-          }
-        } else if (e.target.name === 'rt-mode') preview();
+        if (e.target.name === 'rt-mode') preview();
       });
       back.addEventListener('click', (e) => {
         const b = e.target.closest('[data-r]');

@@ -65,7 +65,7 @@ bấm **Lưu cài đặt AI**). Nút **← Quay lại** ở góc dưới trái �
 
 Gõ trực tiếp vào trang. Thanh công cụ (từ trái sang): **Mới · Mở · Lưu · tên file** – **H1 H2 H3** (tiêu đề) –
 **B** đậm · *I* nghiêng · ~~S~~ gạch · \`</>\` code – liên kết · ảnh – danh sách · danh sách số · việc cần làm –
-trích dẫn · khối code · bảng · đường kẻ – **∑** công thức · **Mermaid** · **[1]** chú thích · mục lục.
+trích dẫn · khối code · bảng · đường kẻ – **∑** công thức · **[1]** chú thích · mục lục.
 
 - Bôi đen chữ rồi bấm nút để định dạng; bấm lại để bỏ.
 - \`Ctrl+B\` đậm · \`Ctrl+I\` nghiêng · \`Ctrl+K\` liên kết · \`Ctrl+E\` code · \`Tab\` / \`Shift+Tab\` thụt lề danh sách.
@@ -92,14 +92,19 @@ trích dẫn · khối code · bảng · đường kẻ – **∑** công thức
 ### Công thức, Mermaid, chú thích, mục lục
 
 Tài liệu hiển thị được những gì GitHub, VS Code, Obsidian, Typora hiển thị. Không cần nhớ cú pháp: dùng các nút
-**∑** (công thức), **Mermaid**, **[1]** (chú thích) và nút **mục lục** trên thanh công cụ. **Nhấn đúp** vào sơ đồ Mermaid,
-công thức, chú thích hay bảng thông tin đầu tài liệu để sửa – hộp thoại có **xem trước** ngay.
+**∑** (công thức), **[1]** (chú thích) và nút **mục lục** trên thanh công cụ. **Nhấn đúp** vào công thức, chú thích hay
+bảng thông tin đầu tài liệu để sửa – hộp thoại có **xem trước** ngay.
+
+**Sơ đồ Mermaid** có sẵn trong file (mở file, dán vào, hoặc AI viết) được vẽ ra như trên GitHub. Muốn sửa: **nhấn đúp**
+(hoặc **◆ Sửa trên whiteboard**) – sơ đồ được **chuyển thành diagram của ứng dụng** để sửa kéo thả. Chuyển được: lưu đồ
+(flowchart / graph), tuần tự, class, state, ER. Loại không có dạng tương ứng trên whiteboard (Gantt, biểu đồ tròn, sơ đồ tư
+duy, dòng thời gian…) thì sửa bằng mã.
 
 | Muốn có | Viết trong Markdown (chế độ developer) |
 | --- | --- |
 | Công thức trong dòng | \`$E=mc^2$\` (hoặc \`$\`…\`$\` kiểu GitHub) |
 | Công thức riêng một khối | dòng \`$$\`, công thức, dòng \`$$\` – hoặc khối \`\` \`\`\`math \`\` |
-| Sơ đồ Mermaid (Gantt, biểu đồ tròn, sơ đồ tư duy, tuần tự, timeline…) | khối \`\` \`\`\`mermaid \`\` |
+| Sơ đồ Mermaid có sẵn (lưu đồ, Gantt, biểu đồ tròn, sơ đồ tư duy…) | khối \`\` \`\`\`mermaid \`\` |
 | Chú thích cuối trang | \`[^1]\` trong câu, và một dòng \`[^1]: nội dung\` |
 | Mục lục tự động | một dòng \`[TOC]\` |
 | Emoji | \`:rocket:\` \`:tada:\` \`:white_check_mark:\` (tên giống GitHub) |
@@ -108,8 +113,7 @@ công thức, chú thích hay bảng thông tin đầu tài liệu để sửa �
 | Thông tin đầu tài liệu (front matter) | khối \`---\` … \`---\` ở đầu file, mỗi dòng \`khoá: giá trị\` |
 
 - **Khối code** có tên ngôn ngữ (\`\`\`js, \`\`\`python, \`\`\`sql…) được **tô màu cú pháp**.
-- Sơ đồ Mermaid dùng cho loại whiteboard không vẽ: tiến độ (Gantt), tỉ lệ (biểu đồ tròn), sơ đồ tư duy, dòng thời gian, nhánh Git…
-  Lưu đồ, BPMN, UML, ERD nên vẽ bằng **◆ Diagram mới** để sửa kéo thả được.
+- Vẽ lưu đồ, BPMN, UML, ERD mới: dùng **◆ Diagram mới**.
 - Thư viện vẽ (Mermaid, KaTeX, highlight.js) được tải từ internet **ở lần dùng đầu tiên**, sau đó chạy cả khi offline.
   Khi chưa tải được, tài liệu vẫn hiện mã gốc và không mất gì.
 - File \`.md\` lưu đúng cú pháp chuẩn ở trên, nên mở trên GitHub, VS Code, Obsidian vẫn hiển thị. File **HTML** xuất ra chứa sẵn
@@ -123,16 +127,14 @@ Có sẵn mã PlantUML (\`@startuml\` … \`@enduml\`)? Ứng dụng **tự dị
 | Muốn | Làm |
 | --- | --- |
 | Đưa vào tài liệu | **Dán** mã PlantUML vào trang (tự bọc thành khối \`\` \`\`\`plantuml \`\`), hoặc kéo thả file \`.puml\` vào tab Tài liệu |
-| Sửa mã | **Nhấn đúp** vào sơ đồ (hoặc nút **✎ Mã**) – hộp thoại có xem trước |
-| Sửa kéo thả | Nút **◆ Sửa trên whiteboard**: khối PlantUML được thay bằng diagram nhúng, mở ở tab Diagram để sửa tự do |
+| Sửa | **Nhấn đúp** vào sơ đồ (hoặc **◆ Sửa trên whiteboard**): khối PlantUML được chuyển thành diagram của ứng dụng, mở ở tab Diagram để sửa kéo thả |
 | Mở thành diagram | Nút **Mở** ở tab Diagram chọn file \`.puml\`, kéo thả file vào tab Diagram, hoặc dán mã vào ô **JSON** rồi **Áp dụng** |
 
 - Hỗ trợ: **sequence** (tuần tự), **use case**, **class**, **activity** (cả cú pháp mới và cũ, có làn bơi), **state**,
   **component / deployment**, **ER** (cơ sở dữ liệu, chân chim).
 - Màu sắc, \`skinparam\`, \`!include\` và vài lệnh hiếm được **bỏ qua** – ở tab Tài liệu có dòng ⚠ liệt kê những gì đã bỏ qua.
-- Loại khác (mindmap, gantt, wireframe…) hiện thông báo rõ ràng kèm mã gốc; dùng \`\` \`\`\`mermaid \`\` cho các loại này.
-- File \`.md\` vẫn giữ nguyên mã PlantUML, nên mở ở nơi khác (VS Code, GitLab…) vẫn dùng được. Sau khi **◆ Sửa trên whiteboard**
-  thì khối đó trở thành diagram của ứng dụng (không còn mã PlantUML).
+- Loại khác (mindmap, gantt, wireframe…) hiện thông báo rõ ràng kèm mã gốc – nút **✎ Sửa mã** để sửa.
+- File \`.md\` vẫn giữ nguyên mã PlantUML cho tới khi bạn sửa sơ đồ – sau đó khối đó là diagram của ứng dụng (không còn mã PlantUML).
 
 ### Mở, lưu và kéo thả
 

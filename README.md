@@ -173,8 +173,13 @@ Tab Tài liệu hiển thị các phần mở rộng phổ biến của GitHub /
 - **Offline**: service worker lưu các file CDN (URL có số phiên bản) vào cache riêng `diagram-editor-cdn-v1`. Chưa tải
   được thì tài liệu vẫn hiện mã gốc.
 - **Trình soạn trực quan**: các khối này không sửa trực tiếp (giữ mã gốc trong `data-raw`). Nhấn đúp hoặc dùng nút trên
-  thanh công cụ (**∑**, **Mermaid**, **[1]**, mục lục) để mở hộp thoại sửa có xem trước. Chuyển ngược sang Markdown
-  không mất gì.
+  thanh công cụ (**∑**, **[1]**, mục lục) để mở hộp thoại sửa có xem trước. Chuyển ngược sang Markdown không mất gì.
+- **Mermaid chỉ để hiển thị**: không có nút chèn Mermaid – sơ đồ mới vẽ bằng **◆ Diagram mới**. Sơ đồ Mermaid có sẵn (file
+  mở vào, dán, AI viết) được vẽ nguyên bản; khi **sửa** (nhấn đúp / **◆ Sửa trên whiteboard**) nó được **dịch sang diagram
+  của app** (`DE.mermaidConv.convert` trong `js/plantuml.js`, dùng chung bộ dàn trang với PlantUML): flowchart / graph →
+  hình chế độ Flowchart (process, decision, terminator, data, database, subroutine, subgraph → khung…, `classDef` / `style`
+  giữ màu), sequenceDiagram, classDiagram, stateDiagram, erDiagram → UML / ERD. Loại không có hình tương ứng (Gantt, pie,
+  mindmap, timeline, gitGraph…) vẫn sửa bằng mã.
 - **Xuất HTML**: sơ đồ Mermaid nhúng dạng ảnh SVG, công thức dạng **MathML** (không cần CSS / font của KaTeX), code đã
   tô màu – file chạy độc lập, không cần mạng.
 
@@ -199,8 +204,10 @@ mã PlantUML thành JSON diagram của whiteboard rồi vẽ bằng chính bộ 
   gantt, wireframe…) trả về thông báo rõ ràng, tài liệu hiện mã gốc.
 - **An toàn**: kết quả đi qua `DE.normalizeDoc` như mọi JSON khác; chữ luôn được thoát nên SVG chèn thẳng vào trang.
 - **Dùng ở đâu**: khối ```` ```plantuml ```` / ```` ```puml ```` trong tài liệu (dán mã `@startuml` thô cũng tự bọc), file
-  `.puml` / `.plantuml` / `.pu` / `.iuml` / `.wsd` (nút Mở, kéo thả), hoặc dán mã vào tab JSON. Nút **◆ Sửa trên whiteboard**
-  chuyển khối thành diagram nhúng để sửa kéo thả.
+  `.puml` / `.plantuml` / `.pu` / `.iuml` / `.wsd` (nút Mở, kéo thả), hoặc dán mã vào tab JSON. Sửa (nhấn đúp hoặc
+  **◆ Sửa trên whiteboard**) = chuyển khối thành diagram nhúng để sửa kéo thả; khối dịch không được thì **✎ Sửa mã**.
+- **Đường nối không xuyên qua hình**: trước khi chọn cổng nối, app ước lượng đường vuông góc; nếu đi xuyên qua hình khác thì
+  vòng ra cạnh bên (phải / trái, hoặc trên / dưới với bố cục ngang). Nhánh của hình thoi trong lưu đồ ra từ đỉnh trái / phải.
 
 ### Định dạng trong file `.md`
 
@@ -229,7 +236,7 @@ Tab **Thiết kế trang** dựng trang web bằng **kéo thả** cho người k
 [ Mới Mở Lưu  Tên dự án ] [ ↶ ↷ ] [ ⤴ ↑ ↓ ⧉ 🗑 ] [ Máy tính | Máy tính bảng | Điện thoại ] [ ▦ ]   [ ▶ Xem thử ] [ HTML JSON ]
 ┌ Thành phần | Lớp ┐ [ ⌂ Trang chủ ] [ Giới thiệu ] [ ＋ Trang ]  ┌ Thuộc tính | JSON ──────────┐
 │ BỐ CỤC           │ ┌──────────────────────────────────────┐   │ Trang chủ › Khối trang › Hàng │
-│ Khối  Hàng  Cột  │ │ Studio Xanh        Trang chủ  Liên hệ │   │ ▸ NỘI DUNG                    │
+│ Khối  Hàng  Cột  │ │ Studio TrungCTR    Trang chủ  Liên hệ │   │ ▸ NỘI DUNG                    │
 │ NỘI DUNG         │ │   ╭ Nút bấm: Liên hệ ⤴ ✥ ↑ ↓ ⧉ 🗑 ╮   │   │ ▾ ĐỊNH DẠNG                   │
 │ Tiêu đề  Nút …   │ │   [ Liên hệ ngay → ] [ Về chúng tôi ] │   │ ▾ LOẠI NÚT – KHI BẤM          │
 │ ĐIỀU HƯỚNG …     │ └──────────────────────────────────────┘   │ ▸ HIỆU ỨNG KHI DI CHUỘT QUA … │
@@ -287,7 +294,7 @@ Mọi thành phần có nhóm **Hiển thị**: độ rõ, **ẩn trên điện 
 
 ```json
 {
-  "kind": "de-page", "version": 1, "name": "Studio Xanh",
+  "kind": "de-page", "version": 1, "name": "Studio TrungCTR",
   "theme": { "font": "system", "fontSize": 16, "color": "#0f172a", "primary": "#2563eb" },
   "pages": [
     { "id": "p_home", "name": "Trang chủ", "path": "index", "props": { "bg": "#ffffff" },
@@ -623,7 +630,7 @@ js/voice.js            giọng nói: Web Speech / Moonshine offline, lệnh gi�
 js/export.js           xuất SVG / PNG, nhúng Markdown
 js/markdown.js         render Markdown → HTML (CommonMark + GFM + công thức, Mermaid, chú thích, emoji, [TOC], front matter) + làm sạch HTML
 js/md-rich.js          vẽ Mermaid / KaTeX / tô màu code / emoji (tải thư viện từ CDN khi cần, có SRI), hộp thoại sửa có xem trước
-js/plantuml.js         dịch PlantUML → JSON diagram (sequence, use case, class, activity, state, component, ER) + tự dàn trang, chạy offline
+js/plantuml.js         dịch PlantUML và Mermaid → JSON diagram (lưu đồ, sequence, use case, class, activity, state, component, ER) + tự dàn trang, chạy offline
 js/docs.js             tab Tài liệu: soạn / xem .md, mở / lưu file, nhúng & sửa diagram (phiên nhúng), áp dụng tài liệu từ AI
 js/guide.js            tab Hướng dẫn: nội dung hướng dẫn sử dụng (Markdown), mục lục, tìm kiếm, nút “Thử” ví dụ prompt
 js/page-kit.js         thiết kế trang – lõi: danh mục thành phần & thuộc tính, chuẩn hoá / lọc JSON, sinh HTML + CSS, file HTML xuất ra, skill AI

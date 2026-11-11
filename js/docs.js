@@ -272,7 +272,8 @@
     flushVisual();
     renderPreview();
   }
-  async function editRich(el) {
+  /** el: phần tử cần sửa. code = true: luôn sửa bằng mã (Mermaid / PlantUML không chuyển được thành diagram) */
+  async function editRich(el, code = false) {
     const R = DE.mdRich;
     if (!R) return;
     flushVisual();
@@ -290,8 +291,10 @@
     const fence = (raw.match(/^\s*(`{3,}|~{3,})/) || [])[1];
     let o = { kind: 'raw', title: 'Sửa mã HTML', value: raw }, wrap = (v) => v;
     if (blk.classList.contains('md-toc')) return toast('Mục lục tự cập nhật theo các tiêu đề trong tài liệu', 'info');
+    // Mermaid / PlantUML: sửa = chuyển thành diagram của app (kéo thả trên whiteboard); loại không chuyển được thì sửa mã
+    if (!code && (blk.classList.contains('md-mermaid') || blk.classList.contains('md-plantuml')) && richConvert(blk).ok) return richToDiagram(blk);
     if (blk.classList.contains('md-mermaid')) {
-      o = { kind: 'mermaid', title: 'Sửa sơ đồ Mermaid', value: blk.getAttribute('data-src') || '', templates: true };
+      o = { kind: 'mermaid', title: 'Sửa mã sơ đồ Mermaid', value: blk.getAttribute('data-src') || '' };
       wrap = (v) => `${fence || '```'}mermaid\n${v}\n${fence || '```'}`;
     } else if (blk.classList.contains('md-plantuml')) {
       const lang = (raw.match(/^\s*(?:`{3,}|~{3,})\s*([\w-]+)/) || [])[1] || 'plantuml';
@@ -314,16 +317,24 @@
     commitVisualDom();
   }
 
-  /** Khối PlantUML -> diagram của app (sửa kéo thả trên whiteboard) */
-  async function plantumlToDiagram(blk) {
-    const r = DE.mdRich && DE.mdRich.plantumlDoc(blk.getAttribute('data-src'));
-    if (!r || !r.ok) return toast('Chưa đọc được sơ đồ PlantUML này' + (r ? ': ' + r.error : ''), 'warn');
+  /** Dịch khối Mermaid / PlantUML sang diagram JSON của app */
+  function richConvert(blk) {
+    const src = blk.getAttribute('data-src') || '';
+    if (blk.classList.contains('md-mermaid')) return DE.mermaidConv ? DE.mermaidConv.convert(src) : { ok: false, error: 'Thiếu bộ dịch Mermaid' };
+    return (DE.mdRich && DE.mdRich.plantumlDoc(src)) || { ok: false, error: 'Thiếu bộ dịch PlantUML' };
+  }
+  /** Khối Mermaid / PlantUML -> diagram của app (sửa kéo thả trên whiteboard) */
+  async function richToDiagram(blk) {
+    const mm = blk.classList.contains('md-mermaid');
+    const lang = mm ? 'Mermaid' : 'PlantUML';
+    const r = richConvert(blk);
+    if (!r.ok) return toast(`Chưa chuyển được sơ đồ ${lang} này: ${r.error}`, 'warn');
     const ok = await DE.ui.confirm({
-      title: 'Chuyển PlantUML thành diagram sửa được?',
+      title: `Sửa sơ đồ ${lang} trên whiteboard?`,
       message:
-        'Khối mã PlantUML được thay bằng một diagram vẽ trên whiteboard: kéo thả, đổi màu, nối thêm hình… như mọi diagram khác. ' +
-        'Mã PlantUML gốc sẽ không còn trong tài liệu (Ctrl+Z ở khung mã để hoàn tác).' +
-        (r.warnings.length ? `\n\nLưu ý: ${r.warnings.length} chi tiết PlantUML chưa hỗ trợ đã bị bỏ qua.` : ''),
+        `Sơ đồ được chuyển thành diagram của ứng dụng để sửa kéo thả: di chuyển, đổi màu, nối thêm hình… như mọi diagram khác. ` +
+        `Mã ${lang} gốc sẽ được thay bằng diagram này (Ctrl+Z để hoàn tác).` +
+        (r.warnings.length ? `\n\nLưu ý: ${r.warnings.length} chi tiết chưa chuyển được đã bị bỏ qua (màu, kiểu riêng…).` : ''),
       ok: 'Chuyển và mở whiteboard',
     });
     if (!ok) return;
@@ -333,14 +344,6 @@
     blk.setAttribute('data-raw', placeholder(id, doc));
     commitVisualDom();
     startSession({ kind: 'edit', id, doc });
-  }
-
-  async function insertMermaid() {
-    const pos = caretPos();
-    const r = await DE.mdRich.editDialog({ kind: 'mermaid', title: 'Chèn sơ đồ Mermaid', value: '', templates: true, ok: 'Chèn vào tài liệu' });
-    if (!r || !r.value.trim()) return;
-    insertBlock('```mermaid\n' + r.value.trim() + '\n```', pos);
-    renderPreview();
   }
   /** Lưu vị trí con trỏ của khung trực quan trước khi mở hộp thoại (hộp thoại lấy mất focus) */
   function keepCaret() {
@@ -1768,8 +1771,8 @@
       const pb = e.target.closest('[data-pua]');
       if (pb) {
         const blk = pb.closest('.md-plantuml');
-        if (pb.dataset.pua === 'edit') return editRich(blk);
-        if (pb.dataset.pua === 'whiteboard') return plantumlToDiagram(blk);
+        if (pb.dataset.pua === 'edit') return editRich(blk, true);
+        if (pb.dataset.pua === 'whiteboard') return richToDiagram(blk);
         const r = DE.mdRich && DE.mdRich.plantumlDoc(blk.getAttribute('data-src'));
         if (r && r.ok) DE.download((r.doc.meta.name || 'plantuml').replace(/[\\/:*?"<>|]+/g, '_') + '.svg', new Blob([DE.exportSVG(r.doc)], { type: 'image/svg+xml' }));
         return;
@@ -1777,7 +1780,8 @@
       const mb = e.target.closest('[data-mma]');
       if (mb) {
         const blk = mb.closest('.md-mermaid');
-        if (mb.dataset.mma === 'edit') return editRich(blk);
+        if (mb.dataset.mma === 'edit') return editRich(blk, true);
+        if (mb.dataset.mma === 'whiteboard') return richToDiagram(blk);
         const svg = DE.mdRich && DE.mdRich.mermaidSVG(blk.getAttribute('data-src'));
         if (svg) DE.download('so-do-mermaid.svg', new Blob([svg], { type: 'image/svg+xml' }));
         return;
@@ -1818,7 +1822,7 @@
         e.preventDefault();
         return startSession({ kind: 'edit', id: fig.dataset.dg, doc: state.diagrams[fig.dataset.dg] });
       }
-      // Mermaid, công thức, front matter, chú thích, khối HTML: hộp thoại sửa mã
+      // Mermaid / PlantUML: chuyển thành diagram để sửa; công thức, front matter, chú thích, khối HTML: hộp thoại sửa mã
       const rich = e.target.closest('.md-math, .md-raw');
       if (rich && pv.contains(rich)) {
         e.preventDefault();
@@ -2129,7 +2133,6 @@
       toast(`Đã tải xuống "${state.name}"`, 'ok');
     },
     'export-html': exportHTML,
-    mermaid: () => insertMermaid(),
     math: () => insertMath(),
     footnote: () => insertFootnote(),
     toc: () => insertToc(),

@@ -13,6 +13,11 @@
  *    (package, rectangle, node, state con).
  *
  * API: DE.plantuml.convert(text) -> { ok, doc, kind, warnings } | { ok:false, error, kind }
+ *
+ * Mermaid (DE.mermaidConv.convert, cùng dạng kết quả): sequence / class / state / ER có cú pháp gần
+ * PlantUML nên được dịch từng dòng rồi dùng chung bộ phân tích + bố cục ở đây; lưu đồ (flowchart /
+ * graph) có bộ đọc riêng, ra các hình của chế độ Flowchart. Gantt, pie, mindmap… không có hình tương
+ * ứng trên whiteboard -> báo không chuyển được (tài liệu vẫn vẽ chúng bằng thư viện Mermaid).
  * ========================================================================= */
 (function (DE) {
   'use strict';
@@ -768,12 +773,13 @@
   const BODY = '[-.]+(?:(?:left|right|up|down|le|ri|l|r|u|d)[-.]*|\\[[^\\]]*\\][-.]*)?';
   const REL = new RegExp(`^(${OP})\\s*(?:"([^"]*)"\\s*)?(${HL})?(${BODY})(${HR})?\\s*(?:\\[([^\\]]*)\\]\\s*)?(?:"([^"]*)"\\s*)?(${OP})\\s*(?::\\s*(.*))?$`, 'u');
   const ER_HEAD = { '||': 'erOnlyOne', '|o': 'erZeroOne', 'o|': 'erZeroOne', '}o': 'erZeroMany', 'o{': 'erZeroMany', '}|': 'erOneMany', '|{': 'erOneMany' };
-  const CONTAINER = { boundary: 'uml.systemBoundary', package: 'uml.package', node: 'uml.node', composite: 'uml.state' };
+  const CONTAINER = { boundary: 'uml.systemBoundary', package: 'uml.package', node: 'uml.node', composite: 'uml.state', subgraph: 'basic.frame' };
   const PAD = {
     boundary: { t: 46, l: 26, r: 26, b: 26 },
     package: { t: 46, l: 22, r: 22, b: 22 },
     node: { t: 58, l: 22, r: 36, b: 24 },
     composite: { t: 48, l: 22, r: 22, b: 22 },
+    subgraph: { t: 42, l: 24, r: 24, b: 24 },
   };
 
   function parseGraph(P, kind, warn) {
@@ -950,6 +956,12 @@
         continue;
       }
       // ---- khai báo
+      if ((kind === 'class' || kind === 'er') && (m = l.match(/^(package|namespace)\s+(.+?)\s*\{\s*$/i))) {
+        const na = nameAlias(m[2]);
+        const n = add(na.key, 'package', na.text);
+        stack.push(n.key);
+        continue;
+      }
       if (kind === 'class' && (m = l.match(/^(abstract\s+class|abstract|class|interface|enum|annotation|entity|protocol|struct|exception|metaclass|stereotype|circle|diamond|dataclass|record)\s+(.+)$/i))) {
         let rest = m[2];
         let ext = '';
@@ -1097,9 +1109,59 @@
     actor: 'uml.actor', usecase: 'uml.useCase', component: 'uml.component', lollipop: 'uml.providedInterface', database: 'flow.database',
     artifact: 'uml.artifact', note: 'uml.note', state: 'uml.state', initial: 'uml.initial', final: 'uml.final', choice: 'uml.decision',
     fork: 'uml.forkH', history: 'uml.history', action: 'uml.action', 'node-leaf': 'uml.node',
+    // lưu đồ (từ Mermaid flowchart)
+    'fl:process': 'flow.process', 'fl:roundrect': 'basic.roundrect', 'fl:terminator': 'flow.terminator', 'fl:decision': 'flow.decision',
+    'fl:data': 'flow.data', 'fl:database': 'flow.database', 'fl:connector': 'flow.connector', 'fl:predefined': 'flow.predefined',
+    'fl:preparation': 'flow.preparation', 'fl:manualOperation': 'flow.manualOperation', 'fl:manualInput': 'flow.manualInput',
+    'fl:document': 'flow.document', 'fl:multiDocument': 'flow.multiDocument', 'fl:delay': 'flow.delay', 'fl:display': 'flow.display',
+    'fl:comment': 'flow.comment', 'fl:text': 'basic.text',
   };
+  function sizeFlow(n, t) {
+    const k = n.type.slice(3);
+    let w, h;
+    switch (k) {
+      case 'decision':
+        w = clamp(tw(t) * 1.25 + 60, 130, 280);
+        h = Math.max(84, wrapLines(t, w * 0.6) * LH * 1.5 + 44);
+        break;
+      case 'terminator':
+        w = clamp(tw(t) + 48, 110, 260);
+        h = Math.max(50, wrapLines(t, w - 36) * LH + 22);
+        break;
+      case 'connector':
+        w = h = clamp(tw(t) + 26, 48, 130);
+        break;
+      case 'database':
+        w = clamp(tw(t) + 40, 110, 240);
+        h = Math.max(80, wrapLines(t, w - 20) * LH + 44);
+        break;
+      case 'data':
+      case 'preparation':
+      case 'manualOperation':
+      case 'manualInput':
+        w = clamp(tw(t) + 64, 130, 300);
+        h = Math.max(60, wrapLines(t, w - 60) * LH + 24);
+        break;
+      case 'document':
+      case 'multiDocument':
+        w = clamp(tw(t) + 40, 130, 280);
+        h = Math.max(74, wrapLines(t, w - 24) * LH * 1.3 + 30);
+        break;
+      case 'text':
+        w = clamp(tw(t) + 16, 40, 300);
+        h = Math.max(30, wrapLines(t, w) * LH + 8);
+        break;
+      default:
+        w = clamp(tw(t) + 40, 120, 280);
+        h = Math.max(56, wrapLines(t, w - 24) * LH + 26);
+    }
+    n.w = n.fw = w;
+    n.h = n.fh = h;
+    n.ox = n.oy = 0;
+  }
   function sizeLeaf(n) {
     const t = n.text || '';
+    if (String(n.type).startsWith('fl:')) return sizeFlow(n, t);
     let w, h, fw, fh;
     switch (n.type) {
       case 'class':
@@ -1361,7 +1423,7 @@
 
   function layoutGraph(G, kind) {
     const N = G.nodes;
-    const isCont = (n) => n.kids.length > 0 || ['boundary', 'package', 'node', 'composite'].includes(n.type);
+    const isCont = (n) => n.kids.length > 0 || ['boundary', 'package', 'node', 'composite', 'subgraph'].includes(n.type);
     function group(parentKey) {
       const kids = parentKey ? N.get(parentKey).kids : G.order.filter((k) => !N.get(k).parent);
       for (const k of kids) {
@@ -1372,7 +1434,15 @@
           group(k);
         } else sizeLeaf(n);
       }
-      if (!kids.length) return { w: 120, h: 50 };
+      if (!kids.length) {
+        if (parentKey) {
+          const c = N.get(parentKey);
+          c.w = c.fw = Math.max(tw(c.text, true) + 50, 160);
+          c.h = c.fh = 90;
+          c.ox = c.oy = 0;
+        }
+        return { w: 120, h: 50 };
+      }
       const set = new Set(kids);
       const lift = (key) => {
         let k = key;
@@ -1405,15 +1475,16 @@
       return r;
     }
     group(null);
-    const out = [];
+    const out = [], contIds = new Set();
     const emit = (key, ax, ay) => {
       const n = N.get(key);
       const type = CONTAINER[n.type] || SHAPE[n.type] || 'uml.component';
       let text = n.text;
       if (n.type === 'composite') text = n.text + '\n--';
       else if (n.type === 'node' && n.stereo) text = `«${n.stereo}»\n${n.text}`;
-      const node = { id: 'n' + (out.length + 1), type, x: Math.round(ax + (n.ox || 0)), y: Math.round(ay + (n.oy || 0)), w: Math.round(n.w), h: Math.round(n.h), text, style: {} };
-      if (n.type === 'composite') node.style = { fill: '#f0fdff' };
+      const node = { id: 'n' + (out.length + 1), type, x: Math.round(ax + (n.ox || 0)), y: Math.round(ay + (n.oy || 0)), w: Math.round(n.w), h: Math.round(n.h), text, style: Object.assign({}, n.style || {}) };
+      if (n.type === 'composite') node.style = Object.assign({ fill: '#f0fdff' }, node.style);
+      if (CONTAINER[n.type]) contIds.add(node.id);
       n.id = node.id;
       out.push(node);
       for (const k of n.kids) {
@@ -1427,17 +1498,83 @@
     }
     let eid = 0;
     const byId = new Map(out.map((n) => [n.id, n]));
+    // ---- chọn cổng nối: ước lượng đường vuông góc, tránh đi xuyên qua hình khác
+    // (tính trong hệ "trên xuống"; bố cục LR thì đổi trục x <-> y)
+    const T = G.dir === 'LR';
+    const tr = (r) => (T ? { id: r.id, type: r.type, x: r.y, y: r.x, w: r.h, h: r.w } : r);
+    const OB = out.filter((n) => !contIds.has(n.id)).map(tr);
+    const BACK = { top: 'left', bottom: 'right', left: 'top', right: 'bottom' };
+    const portOf = (p) => (T ? BACK[p] : p);
+    const hits = (segs, skip) => {
+      let k = 0;
+      for (const r of OB) {
+        if (skip.has(r.id)) continue;
+        const hit = segs.some(([x1, y1, x2, y2]) =>
+          x1 === x2
+            ? x1 > r.x + 1 && x1 < r.x + r.w - 1 && Math.max(y1, y2) > r.y + 1 && Math.min(y1, y2) < r.y + r.h - 1
+            : y1 > r.y + 1 && y1 < r.y + r.h - 1 && Math.max(x1, x2) > r.x + 1 && Math.min(x1, x2) < r.x + r.w - 1
+        );
+        if (hit) k++;
+      }
+      return k;
+    };
+    const PORTS = { bt: null, tb: null, rr: ['right', 'right'], ll: ['left', 'left'], lt: ['left', 'top'], rt: ['right', 'top'] };
+    function route(o, s0, t0, e) {
+      const s = tr(s0), t = tr(t0), skip = new Set([s.id, t.id]);
+      const sx = s.x + s.w / 2, sy = s.y + s.h / 2, tx = t.x + t.w / 2, ty = t.y + t.h / 2, GAP = 24;
+      const C = {
+        bt: () => {
+          const y1 = s.y + s.h, y2 = t.y, ym = (y1 + y2) / 2;
+          return [[sx, y1, sx, ym], [sx, ym, tx, ym], [tx, ym, tx, y2]];
+        },
+        tb: () => {
+          const y1 = s.y, y2 = t.y + t.h, ym = (y1 + y2) / 2;
+          return [[sx, y1, sx, ym], [sx, ym, tx, ym], [tx, ym, tx, y2]];
+        },
+        rr: () => {
+          const cx = Math.max(s.x + s.w, t.x + t.w) + GAP;
+          return [[s.x + s.w, sy, cx, sy], [cx, sy, cx, ty], [cx, ty, t.x + t.w, ty]];
+        },
+        ll: () => {
+          const cx = Math.min(s.x, t.x) - GAP;
+          return [[s.x, sy, cx, sy], [cx, sy, cx, ty], [cx, ty, t.x, ty]];
+        },
+        lt: () => [[s.x, sy, tx, sy], [tx, sy, tx, t.y]],
+        rt: () => [[s.x + s.w, sy, tx, sy], [tx, sy, tx, t.y]],
+      };
+      let cands;
+      if (t.y >= s.y + s.h - 2) {
+        cands = ['bt', 'rr', 'll'];
+        // lưu đồ: nhánh của hình thoi ra từ đỉnh trái / phải
+        if (kind === 'flowchart' && s0.type === 'flow.decision') {
+          if (tx < s.x - 4) cands.unshift('lt');
+          else if (tx > s.x + s.w + 4) cands.unshift('rt');
+        }
+      } else if (t.y + t.h <= s.y + 2) cands = e.rank === 'up' ? ['tb', 'rr', 'll'] : ['rr', 'll'];
+      else return;
+      let best = cands[0], bh = hits(C[best](), skip);
+      for (const c of cands.slice(1)) {
+        if (!bh) break;
+        const h = hits(C[c](), skip);
+        if (h < bh) {
+          best = c;
+          bh = h;
+        }
+      }
+      const pp = PORTS[best];
+      if (pp) {
+        o.sourcePort = portOf(pp[0]);
+        o.targetPort = portOf(pp[1]);
+      }
+    }
     const edges = G.edges
       .filter((e) => N.get(e.from) && N.get(e.to))
       .map((e) => {
         const o = { id: 'e' + ++eid, type: e.type, source: N.get(e.from).id, target: N.get(e.to).id, label: e.label || '', style: e.style || {} };
         if (kind === 'usecase' && (e.type === 'uml.association' || e.type === 'uml.directedAssociation')) o.routing = 'straight';
-        // cạnh quay ngược (vòng lặp): đi vòng ra cạnh bên, không đè lên cạnh đi xuôi
+        // cạnh quay ngược (vòng lặp) đi vòng ra cạnh bên; cạnh dài không xuyên qua hình nằm giữa
         const s = byId.get(o.source), t = byId.get(o.target);
-        if (e.rank === 'down' && s && t && o.source !== o.target) {
-          if (G.dir === 'TB' && t.y + t.h <= s.y - 4) o.sourcePort = o.targetPort = 'right';
-          if (G.dir === 'LR' && t.x + t.w <= s.x - 4) o.sourcePort = o.targetPort = 'bottom';
-        }
+        if (s && t && o.source !== o.target && e.rank !== 'same' && !contIds.has(s.id) && !contIds.has(t.id)) route(o, s, t, e);
         if (o.source === o.target) {
           o.sourcePort = 'right';
           o.targetPort = 'top';
@@ -1445,6 +1582,22 @@
         return o;
       });
     return { nodes: out, edges };
+  }
+
+  // ============================================================ HOÀN THIỆN (dùng chung)
+  function finish(g, kind, name, mode, warn) {
+    if (!g.nodes.length) return { ok: false, kind, error: 'Không tìm thấy phần tử nào trong sơ đồ' };
+    if (g.nodes.length > 600) return { ok: false, kind, error: 'Sơ đồ quá lớn (trên 600 phần tử)' };
+    // dời về góc trên trái
+    const minX = Math.min(...g.nodes.map((n) => n.x)), minY = Math.min(...g.nodes.map((n) => n.y));
+    g.nodes.forEach((n) => {
+      n.x = Math.round(n.x - minX + 40);
+      n.y = Math.round(n.y - minY + 40);
+      n.w = Math.max(2, Math.round(n.w));
+      n.h = Math.max(2, Math.round(n.h));
+    });
+    const r = DE.normalizeDoc({ version: 1, meta: { name, mode }, nodes: g.nodes, edges: g.edges });
+    return { ok: true, kind, doc: r.doc, warnings: warn.list.concat(r.removed.map((x) => 'bỏ ' + x)) };
   }
 
   // ============================================================ API
@@ -1462,18 +1615,506 @@
       else if (kind === 'activity') g = parseActivity(P, warn);
       else if (PU.KIND_NAME[kind]) g = layoutGraph(parseGraph(P, kind, warn), kind);
       else return { ok: false, kind, error: `Chưa hỗ trợ loại sơ đồ PlantUML: ${kind}` };
-      if (g.nodes.length > 600) return { ok: false, kind, error: 'Sơ đồ quá lớn (trên 600 phần tử)' };
-      // dời về góc trên trái
-      const minX = Math.min(...g.nodes.map((n) => n.x)), minY = Math.min(...g.nodes.map((n) => n.y));
-      g.nodes.forEach((n) => {
-        n.x = Math.round(n.x - minX + 40);
-        n.y = Math.round(n.y - minY + 40);
-        n.w = Math.max(2, Math.round(n.w));
-        n.h = Math.max(2, Math.round(n.h));
-      });
-      const raw = { version: 1, meta: { name: P.title || PU.KIND_NAME[kind] || 'PlantUML', mode: 'uml' }, nodes: g.nodes, edges: g.edges };
-      const r = DE.normalizeDoc(raw);
-      return { ok: true, kind, doc: r.doc, warnings: warn.list.concat(r.removed.map((x) => 'bỏ ' + x)) };
+      return finish(g, kind, P.title || PU.KIND_NAME[kind] || 'PlantUML', 'uml', warn);
+    } catch (e) {
+      return { ok: false, kind, error: e.message || String(e) };
+    }
+  };
+
+  // ============================================================ MERMAID
+  const MM = (DE.mermaidConv = {});
+  MM.KIND_NAME = { flowchart: 'Flowchart', sequence: 'Sequence (tuần tự)', class: 'Class', state: 'State machine', er: 'ER (cơ sở dữ liệu)' };
+  const MM_OTHER = {
+    gantt: 'Gantt', pie: 'biểu đồ tròn', mindmap: 'sơ đồ tư duy', journey: 'hành trình người dùng', timeline: 'dòng thời gian',
+    gitgraph: 'nhánh Git', quadrantchart: 'ma trận 4 ô', xychart: 'biểu đồ XY', sankey: 'Sankey', requirementdiagram: 'sơ đồ yêu cầu',
+    block: 'sơ đồ khối', packet: 'gói tin', kanban: 'Kanban', architecture: 'kiến trúc', zenuml: 'ZenUML', radar: 'radar', treemap: 'treemap',
+    c4context: 'C4', c4container: 'C4', c4component: 'C4', c4dynamic: 'C4', c4deployment: 'C4',
+  };
+  MM.OTHER_NAME = MM_OTHER;
+  const ENT = { quot: '"', amp: '&', lt: '<', gt: '>', nbsp: ' ', apos: "'", '35': '#', '59': ';' };
+  /** Chữ hiển thị của Mermaid: bỏ ngoặc kép, chuỗi markdown `…`, thẻ HTML định dạng; <br> -> xuống dòng */
+  const mmText = (v) => {
+    let t = String(v == null ? '' : v).trim();
+    if (/^"[\s\S]*"$/.test(t)) t = t.slice(1, -1).trim();
+    if (/^`[\s\S]*`$/.test(t)) t = t.slice(1, -1).replace(/\*\*([^*]+)\*\*/g, '$1').replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1$2').replace(/_([^_]+)_/g, '$1');
+    return t
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/#(\w+);/g, (m0, k) => (ENT[k] != null ? ENT[k] : /^\d+$/.test(k) ? String.fromCodePoint(Math.min(+k, 0x10ffff)) : m0))
+      .replace(/<\/?(b|i|u|em|strong|small|big|sub|sup|span|code)\b[^>]*>/gi, '')
+      .replace(/^fa:fa-[\w-]+\s*/, '')
+      .trim();
+  };
+  /** Chữ đặt vào một dòng kiểu PlantUML (xuống dòng ghi thành \n) */
+  const mmInline = (v) => mmText(v).replace(/\n/g, '\\n');
+
+  function mmPrep(src) {
+    let s = String(src || '').replace(/\r\n?/g, '\n');
+    let title = '';
+    const fm = s.match(/^\s*---[ \t]*\n([\s\S]*?)\n---[ \t]*(\n|$)/);
+    if (fm) {
+      const t = fm[1].match(/^title:\s*(.+)$/m);
+      if (t) title = mmText(t[1]);
+      s = s.slice(fm[0].length);
+    }
+    s = s.replace(/%%\{[\s\S]*?\}%%/g, '');
+    const lines = [];
+    let skip = false;
+    for (const r of s.split('\n')) {
+      const l = r.trim();
+      if (skip) {
+        if (l.includes('}')) skip = false;
+        continue;
+      }
+      if (!l || l.startsWith('%%')) continue;
+      if (/^acc(Title|Descr)\s*:/.test(l)) continue;
+      if (/^accDescr\s*\{/.test(l)) {
+        if (!l.includes('}')) skip = true;
+        continue;
+      }
+      lines.push(l);
+    }
+    const head = lines.shift() || '';
+    const m = head.match(/^([\w-]+)(?:[\s;]+(.*))?$/) || [];
+    const kw = (m[1] || '').toLowerCase().replace(/-(beta|v2|elk)$/, '');
+    const kind =
+      kw === 'graph' || kw === 'flowchart' ? 'flowchart'
+        : kw === 'sequencediagram' ? 'sequence'
+          : kw === 'classdiagram' ? 'class'
+            : kw === 'statediagram' ? 'state'
+              : kw === 'erdiagram' ? 'er'
+                : MM_OTHER[kw] ? kw : 'unknown';
+    return { kind, lines, rest: (m[2] || '').trim(), title };
+  }
+  MM.kindOf = (src) => mmPrep(src).kind;
+  MM.canConvert = (src) => !!MM.KIND_NAME[mmPrep(src).kind];
+
+  // ---- sequence -> dòng PlantUML
+  const MM_MSG = /^(.+?)\s*(<<-->>|<<->>|-->>|->>|--x|-x|--\)|-\)|-->|->)\s*([+-]?)\s*([^:]+?)\s*(?::\s*(.*))?$/;
+  function mmSequence(M, warn) {
+    const out = [], blocks = [];
+    const id = (x) => '"' + String(x).trim().replace(/"/g, "'") + '"';
+    for (let l of M.lines) {
+      let m;
+      l = l.replace(/^create\s+/i, '');
+      if ((m = l.match(/^(participant|actor)\s+(.+?)(?:\s+as\s+(.+))?$/i))) {
+        const key = m[2].replace(/@\{[\s\S]*$/, '').trim();
+        out.push(`${m[1].toLowerCase()} "${mmInline(m[3] || key).replace(/"/g, "'")}" as ${id(key)}`);
+      } else if ((m = l.match(/^(activate|deactivate|destroy)\s+(.+)$/i))) out.push(`${m[1].toLowerCase()} ${id(m[2])}`);
+      else if ((m = l.match(/^note\s+(left of|right of|over)\s+([^:]+?)\s*:\s*(.*)$/i)))
+        out.push(`note ${m[1].toLowerCase()} ${m[2].split(',').map(id).join(',')} : ${mmInline(m[3])}`);
+      else if ((m = l.match(/^(loop|alt|opt|par|critical|break)\b\s*(.*)$/i))) {
+        blocks.push(m[1].toLowerCase());
+        out.push(`${m[1].toLowerCase()} ${mmInline(m[2])}`);
+      } else if ((m = l.match(/^(rect|box)\b/i))) {
+        blocks.push('skip');
+        warn(m[1].toLowerCase() === 'box' ? 'nhóm box' : 'vùng tô màu (rect)');
+      } else if ((m = l.match(/^(else|and|option)\b\s*(.*)$/i))) out.push(`else ${mmInline(m[2])}`);
+      else if (/^end$/i.test(l)) {
+        if (blocks.pop() !== 'skip') out.push('end');
+      } else if (/^autonumber\b/i.test(l)) out.push('autonumber');
+      else if ((m = l.match(/^title\s*:?\s*(.+)$/i))) M.title = M.title || mmText(m[1]);
+      else if (/^(links?|properties|details)\b/i.test(l)) warn('liên kết của participant');
+      else if ((m = l.match(MM_MSG))) {
+        const [, a, arrow, act, b, label] = m;
+        const dashed = arrow.includes('--');
+        let op = dashed ? '-->' : '->';
+        if (/\)$/.test(arrow)) op = dashed ? '-->>' : '->>';
+        if (arrow.startsWith('<<')) op = dashed ? '<-->' : '<->';
+        out.push(`${id(a)} ${op} ${id(b)}${act === '+' ? ' ++' : act === '-' ? ' --' : ''}${label ? ' : ' + mmInline(label) : ''}`);
+      } else warn(`dòng chưa hiểu: ${l.slice(0, 60)}`);
+    }
+    return out;
+  }
+
+  // ---- class -> dòng PlantUML
+  function mmClass(M, warn) {
+    const L = M.lines, out = [];
+    const gen = (x) => String(x).replace(/~([^~]*)~/g, '<$1>');
+    const ANN = { interface: 'interface', abstract: 'abstract class', enumeration: 'enum', enum: 'enum' };
+    const ann = new Map(); // tên lớp -> chú thích <<interface>>…
+    const declared = new Set();
+    // lượt 1: chú thích đứng riêng (<<interface>> Animal) và trong thân lớp
+    for (let i = 0; i < L.length; i++) {
+      let m;
+      if ((m = L[i].match(/^<<\s*([^>]+?)\s*>>\s*([^\s{]+)\s*$/))) ann.set(m[2], m[1]);
+      else if ((m = L[i].match(/^class\s+([^\s{\["~:]+)/i)) && /\{\s*$/.test(L[i]))
+        for (let j = i + 1; j < L.length && L[j] !== '}'; j++) {
+          const a = L[j].match(/^<<\s*([^>]+?)\s*>>$/);
+          if (a) ann.set(m[1], a[1]);
+        }
+    }
+    const kwOf = (name) => {
+      const a = (ann.get(name) || '').toLowerCase();
+      return ANN[a] ? [ANN[a], ''] : ['class', a ? ` <<${ann.get(name)}>>` : ''];
+    };
+    let styled = false;
+    for (let i = 0; i < L.length; i++) {
+      const l = L[i].replace(/:::[\w-]+/g, '');
+      let m;
+      if ((m = l.match(/^direction\s+(LR|RL|TB|BT|TD)$/i))) out.push(/LR|RL/i.test(m[1]) ? 'left to right direction' : 'top to bottom direction');
+      else if ((m = l.match(/^namespace\s+(\S+?)\s*\{$/i))) out.push(`package ${m[1]} {`);
+      else if (/^<<[^>]+>>\s*\S+$/.test(l)) continue;
+      else if ((m = l.match(/^class\s+([^\s{\["~:]+)(~[^~]*~)?(?:\s*\[\s*"([^"]*)"\s*\])?\s*(\{)?\s*(\})?\s*$/i))) {
+        const [kw, stereo] = kwOf(m[1]);
+        declared.add(m[1]);
+        const name = m[3] ? `"${mmInline(m[3]).replace(/"/g, "'")}" as ${m[1]}` : m[1];
+        if (m[4] && !m[5]) {
+          out.push(`${kw} ${name}${gen(m[2] || '')}${stereo} {`);
+          while (++i < L.length && L[i] !== '}') {
+            const x = L[i];
+            if (/^<<[^>]+>>$/.test(x)) continue;
+            out.push(gen(x).replace(/\$\s*$/, '').replace(/\*\s*$/, '').trim());
+          }
+          out.push('}');
+        } else out.push(`${kw} ${name}${gen(m[2] || '')}${stereo}`);
+      } else if ((m = l.match(/^note\s+for\s+(\S+)\s+"([\s\S]*)"$/i))) out.push(`note right of ${m[1]} : ${mmInline(m[2])}`);
+      else if ((m = l.match(/^note\s+"([\s\S]*)"$/i))) out.push(`note "${mmInline(m[1]).replace(/"/g, "'")}" as MMNOTE${i}`);
+      else if (/^(style|classDef|cssClass|class\s+\S+\s*,|link|click|callback)\b/i.test(l)) {
+        if (!styled) warn('màu / liên kết (style, classDef, click…)');
+        styled = true;
+      } else out.push(gen(l));
+    }
+    // lớp chỉ có chú thích, chưa khai báo
+    for (const [name] of ann) if (!declared.has(name)) out.unshift(`${kwOf(name)[0]} ${name}${kwOf(name)[1]}`);
+    return out;
+  }
+
+  // ---- state -> dòng PlantUML
+  function mmState(M, warn) {
+    const out = [];
+    let styled = false;
+    for (const l0 of M.lines) {
+      const l = l0.replace(/:::[\w-]+/g, '');
+      let m;
+      if ((m = l.match(/^direction\s+(LR|RL|TB|BT|TD)$/i))) out.push(/LR|RL/i.test(m[1]) ? 'left to right direction' : 'top to bottom direction');
+      else if (/^(classDef|class\s|style\s)/i.test(l)) {
+        if (!styled) warn('màu (classDef, style…)');
+        styled = true;
+      } else out.push(l.replace(/<br\s*\/?>/gi, '\\n'));
+    }
+    return out;
+  }
+
+  // ---- ER -> dòng PlantUML (tên thực thể có thể chứa "-" nên luôn đặt trong ngoặc kép)
+  const ER_WORD_L = { 'one or zero': '|o', 'zero or one': '|o', 'one or more': '}|', 'one or many': '}|', 'many(1)': '}|', '1+': '}|', 'zero or more': '}o', 'zero or many': '}o', 'many(0)': '}o', '0+': '}o', 'only one': '||', '1': '||' };
+  const ER_FLIP = { '|o': 'o|', '}|': '|{', '}o': 'o{', '||': '||' };
+  const ER_WORDS = Object.keys(ER_WORD_L).sort((x, y) => y.length - x.length).map((w) => w.replace(/[()+]/g, '\\$&')).join('|');
+  const ER_SYM = /^("[^"]+"|[^\s|}{"]+)\s*(\|o|\|\||\}o|\}\|)(--|\.\.)(o\||\|\||o\{|\|\{)\s*("[^"]+"|[^\s:"]+)\s*:\s*(.*)$/;
+  const ER_TXT = new RegExp(`^("[^"]+"|\\S+)\\s+(${ER_WORDS})\\s+(to|optionally to)\\s+(${ER_WORDS})\\s+("[^"]+"|\\S+)\\s*:\\s*(.*)$`, 'i');
+  function mmER(M, warn) {
+    const L = M.lines, out = [];
+    const q = (x) => '"' + mmText(x).replace(/"/g, "'") + '"';
+    for (let i = 0; i < L.length; i++) {
+      const l = L[i].replace(/:::[\w-]+/g, '');
+      let m;
+      if ((m = l.match(ER_SYM))) out.push(`${q(m[1])} ${m[2]}${m[3]}${m[4]} ${q(m[5])} : ${mmInline(m[6])}`);
+      else if ((m = l.match(ER_TXT))) {
+        const lf = ER_WORD_L[m[2].toLowerCase()], rt = ER_FLIP[ER_WORD_L[m[4].toLowerCase()]];
+        out.push(`${q(m[1])} ${lf}${/optionally/i.test(m[3]) ? '..' : '--'}${rt} ${q(m[5])} : ${mmInline(m[6])}`);
+      } else if ((m = l.match(/^([^\s{\[]+)(?:\s*\[\s*"?([^"\]]*)"?\s*\])?\s*(\{)?\s*$/))) {
+        const name = m[2] ? `"${mmInline(m[2]).replace(/"/g, "'")}" as "${m[1]}"` : q(m[1]);
+        if (!m[3]) {
+          out.push(`entity ${name}`);
+          continue;
+        }
+        out.push(`entity ${name} {`);
+        while (++i < L.length && L[i] !== '}') {
+          const a = L[i].match(/^(\S+)\s+(\S+)\s*((?:PK|FK|UK)(?:\s*,\s*(?:PK|FK|UK))*)?\s*("[^"]*")?\s*$/i);
+          if (!a) continue;
+          const keys = (a[3] || '').toUpperCase();
+          out.push(`${a[2]} : ${a[1].replace(/~([^~]*)~/g, '<$1>')}${/PK/.test(keys) ? ' <<PK>>' : /FK/.test(keys) ? ' <<FK>>' : ''}`);
+        }
+        out.push('}');
+      } else if (/^(direction|style|classDef|class)\b/i.test(l)) warn('hướng / màu (direction, style…)');
+      else warn(`dòng chưa hiểu: ${l.slice(0, 60)}`);
+    }
+    return out;
+  }
+
+  // ---- lưu đồ: đọc riêng, ra đồ thị cho layoutGraph
+  const FL_SHAPES = [
+    ['(((', [')))'], 'connector'], ['((', ['))'], 'connector'], ['([', ['])'], 'terminator'], ['[[', [']]'], 'predefined'],
+    ['[(', [')]'], 'database'], ['{{', ['}}'], 'preparation'], ['[/', ['/]', '\\]'], 'data'], ['[\\', ['\\]', '/]'], 'data'],
+    ['(', [')'], 'roundrect'], ['[', [']'], 'process'], ['{', ['}'], 'decision'], ['>', [']'], 'process'],
+  ];
+  const FL_NEW = {
+    rect: 'process', proc: 'process', process: 'process', rectangle: 'process', rounded: 'roundrect', event: 'roundrect',
+    stadium: 'terminator', terminal: 'terminator', pill: 'terminator', diam: 'decision', diamond: 'decision', decision: 'decision', question: 'decision',
+    hex: 'preparation', hexagon: 'preparation', prepare: 'preparation', 'lean-r': 'data', 'lean-right': 'data', 'lean-l': 'data', 'lean-left': 'data', 'in-out': 'data', 'out-in': 'data',
+    cyl: 'database', cylinder: 'database', database: 'database', db: 'database', circle: 'connector', circ: 'connector', 'sm-circ': 'connector', 'small-circle': 'connector', 'dbl-circ': 'connector', 'double-circle': 'connector',
+    doc: 'document', document: 'document', docs: 'multiDocument', documents: 'multiDocument', 'st-doc': 'multiDocument', 'stacked-document': 'multiDocument',
+    'fr-rect': 'predefined', subprocess: 'predefined', subroutine: 'predefined', 'framed-rectangle': 'predefined',
+    'trap-t': 'manualOperation', 'trap-b': 'manualOperation', manual: 'manualOperation', 'inv-trapezoid': 'manualOperation', trapezoid: 'manualOperation', priority: 'manualOperation',
+    'sl-rect': 'manualInput', 'manual-input': 'manualInput', 'sloped-rectangle': 'manualInput', delay: 'delay', 'half-rounded-rectangle': 'delay',
+    'curv-trap': 'display', display: 'display', 'curved-trapezoid': 'display', comment: 'comment', braces: 'comment', 'brace-l': 'comment', 'brace-r': 'comment', text: 'text',
+  };
+  const ID = /[\p{L}\p{N}_](?:[\p{L}\p{N}_.]|-(?=[\p{L}\p{N}_]))*/uy;
+  const HEAD = '(>|o(?![\\p{L}\\p{N}_])|x(?![\\p{L}\\p{N}_]))';
+  const LINK_PLAIN = new RegExp(`^(<|o|x)?(?:(-{2,})${HEAD}|(-{3,})|(={2,})${HEAD}|(={3,})|(-\\.+-)${HEAD}?|(~{3,}))`, 'u');
+  const LINK_TEXT = /^(<|o|x)?(--|==|-\.)(?![->.=])\s*(.+?)\s*(-{2,}[>ox]|-{3,}|={2,}[>ox]|={3,}|\.+-+[>ox]?)(?=\s|[\p{L}\p{N}_"|]|$)/u;
+  const ARROW_OF = { '>': 'arrow', o: 'circle', x: 'slash' };
+  const hex6 = (v) => (/^#[0-9a-f]{3}$/i.test(v) ? '#' + v.slice(1).replace(/./g, '$&$&') : v.toLowerCase());
+  function mmStyle(props) {
+    const st = {};
+    for (const part of String(props || '').split(',')) {
+      const i = part.indexOf(':');
+      if (i < 0) continue;
+      const k = part.slice(0, i).trim().toLowerCase(), v = part.slice(i + 1).trim().replace(/\s*!important$/, '');
+      if (k === 'stroke-width') {
+        const n = parseFloat(v);
+        if (n > 0) st.strokeWidth = Math.min(n, 6);
+        continue;
+      }
+      if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) continue;
+      if (k === 'fill') st.fill = hex6(v);
+      else if (k === 'stroke') st.stroke = hex6(v);
+      else if (k === 'color') st.textColor = hex6(v);
+    }
+    return st;
+  }
+  /** Tách các câu lệnh bằng ";" – không tách trong ngoặc kép, trong ngoặc của hình, hay mã ký tự #quot; */
+  const splitStmts = (l) => {
+    const out = [];
+    let cur = '', q = false, depth = 0;
+    for (let i = 0; i < l.length; i++) {
+      const ch = l[i];
+      if (ch === '"') q = !q;
+      else if (!q && '[({'.includes(ch)) depth++;
+      else if (!q && '])}'.includes(ch)) depth = Math.max(0, depth - 1);
+      if (ch === ';' && !q && !depth && !/#\w+$/.test(cur)) {
+        if (cur.trim()) out.push(cur.trim());
+        cur = '';
+      } else cur += ch;
+    }
+    if (cur.trim()) out.push(cur.trim());
+    return out;
+  };
+  function mmFlow(M, warn) {
+    const dirTok = (M.rest.match(/^(TB|TD|BT|LR|RL)\b/i) || [])[1] || 'TB';
+    const G = { nodes: new Map(), order: [], edges: [], dir: /LR|RL/i.test(dirTok) ? 'LR' : 'TB', flip: /BT|RL/i.test(dirTok) };
+    const stack = [], classes = {}, nodeClass = [];
+    const cur = () => (stack.length ? stack[stack.length - 1] : null);
+    let auto = 0;
+    function node(key, type, text) {
+      let n = G.nodes.get(key);
+      if (!n) {
+        n = { key, type: type ? 'fl:' + type : 'fl:process', text: text != null ? text : key, parent: cur(), kids: [], members: [], implicit: !type };
+        G.nodes.set(key, n);
+        G.order.push(key);
+        if (n.parent) G.nodes.get(n.parent).kids.push(key);
+        return n;
+      }
+      if (type && n.type !== 'subgraph') {
+        n.type = 'fl:' + type;
+        n.implicit = false;
+      }
+      if (text != null && n.type !== 'subgraph') n.text = text;
+      // nhắc tới trong subgraph khi đang ở ngoài cùng -> chuyển vào subgraph (giống Mermaid)
+      if (!n.parent && cur() && cur() !== key && n.type !== 'subgraph') {
+        n.parent = cur();
+        G.nodes.get(cur()).kids.push(key);
+      }
+      return n;
+    }
+    function statement(st) {
+      const s = st;
+      let i = 0;
+      const ws = () => {
+        while (i < s.length && /\s/.test(s[i])) i++;
+      };
+      const readNode = () => {
+        ws();
+        ID.lastIndex = i;
+        const m = ID.exec(s);
+        if (!m) return null;
+        i = ID.lastIndex;
+        let type = null, text = null;
+        if (s.startsWith('@{', i)) {
+          const k = s.indexOf('}', i);
+          const body = s.slice(i + 2, k < 0 ? s.length : k);
+          i = k < 0 ? s.length : k + 1;
+          const sh = (body.match(/shape\s*:\s*"?([\w-]+)"?/) || [])[1];
+          const lb = body.match(/label\s*:\s*("(?:[^"\\]|\\.)*"|[^,}]+)/);
+          type = sh ? FL_NEW[sh.toLowerCase()] || 'process' : null;
+          if (lb) text = mmText(lb[1]);
+          if (sh && !FL_NEW[sh.toLowerCase()]) warn(`hình "${sh}" vẽ thành hình chữ nhật`);
+        } else
+          for (const [open, closes, t] of FL_SHAPES) {
+            if (!s.startsWith(open, i)) continue;
+            let j = i + open.length, k = -1, close = closes[0];
+            if (s[j] === '"') {
+              const qe = s.indexOf('"', j + 1);
+              if (qe > 0)
+                for (const c of closes)
+                  if (s.startsWith(c, qe + 1)) {
+                    k = qe + 1;
+                    close = c;
+                  }
+            }
+            if (k < 0)
+              for (const c of closes) {
+                const kk = s.indexOf(c, j);
+                if (kk >= 0 && (k < 0 || kk < k)) {
+                  k = kk;
+                  close = c;
+                }
+              }
+            if (k < 0) continue;
+            text = mmText(s.slice(j, k));
+            type = (open === '[/' && close === '\\]') || (open === '[\\' && close === '/]') ? 'manualOperation' : t;
+            i = k + close.length;
+            break;
+          }
+        const cm = /^:::([\w-]+)/.exec(s.slice(i));
+        if (cm) {
+          i += cm[0].length;
+          nodeClass.push([m[0], cm[1]]);
+        }
+        return node(m[0], type, text).key;
+      };
+      const readGroup = () => {
+        const g = [];
+        let k = readNode();
+        if (!k) return null;
+        g.push(k);
+        for (;;) {
+          ws();
+          if (s[i] !== '&') break;
+          i++;
+          k = readNode();
+          if (!k) break;
+          g.push(k);
+        }
+        return g;
+      };
+      const readLink = () => {
+        ws();
+        const rest = s.slice(i);
+        let m = rest.match(LINK_PLAIN), lk;
+        if (m) {
+          const body = m[2] || m[4] || m[5] || m[7] || m[8] || m[10] || '';
+          const head = m[3] || m[6] || m[9] || '';
+          lk = { left: m[1] || '', head, body, label: '' };
+        } else if ((m = rest.match(LINK_TEXT))) {
+          const close = m[4];
+          const head = /[>ox]$/.test(close) ? close.slice(-1) : '';
+          lk = { left: m[1] || '', head, body: m[2] + close, label: mmText(m[3]) };
+        } else return null;
+        i += m[0].length;
+        ws();
+        if (s[i] === '|') {
+          const k = s.indexOf('|', i + 1);
+          if (k > i) {
+            lk.label = mmText(s.slice(i + 1, k));
+            i = k + 1;
+          }
+        }
+        return lk;
+      };
+      let left = readGroup();
+      if (!left) return false;
+      for (;;) {
+        ws();
+        if (i >= s.length) return true;
+        const lk = readLink();
+        if (!lk) return false;
+        const right = readGroup();
+        if (!right) return false;
+        if (!lk.body.startsWith('~')) {
+          const style = {};
+          if (lk.body.includes('.')) style.dash = 'dashed';
+          if (lk.body.includes('=')) style.strokeWidth = 3;
+          style.endArrow = lk.head ? ARROW_OF[lk.head] : 'none';
+          if (lk.left) style.startArrow = lk.left === '<' ? 'arrow' : ARROW_OF[lk.left];
+          for (const a of left) for (const b of right) G.edges.push({ from: a, to: b, type: 'flow.arrow', label: lk.label, style: { ...style }, rank: 'down' });
+        }
+        left = right;
+      }
+    }
+    const first = M.rest.replace(/^(TB|TD|BT|LR|RL)\b\s*;?/i, '').trim();
+    const lines = first ? [first, ...M.lines] : M.lines;
+    let ignored = false;
+    for (const line of lines) {
+      for (const l of splitStmts(line)) {
+        let m;
+        if ((m = l.match(/^subgraph\b\s*(.*)$/i))) {
+          const r = m[1].trim();
+          let key, title;
+          if ((m = r.match(/^([^\s\["]+)\s*\[\s*([\s\S]*?)\s*\]$/))) {
+            key = m[1];
+            title = mmText(m[2]);
+          } else if (/^"[\s\S]*"$/.test(r)) {
+            key = 'subgraph:' + ++auto;
+            title = mmText(r);
+          } else {
+            key = r || 'subgraph:' + ++auto;
+            title = mmText(r);
+          }
+          const n = node(key, null, title);
+          n.type = 'subgraph';
+          n.text = title;
+          n.implicit = false;
+          stack.push(key);
+        } else if (/^end$/i.test(l)) stack.pop();
+        else if (/^direction\s+\w+$/i.test(l)) {
+          if (stack.length) warn('hướng riêng trong subgraph');
+          else G.dir = /LR|RL/i.test(l) ? 'LR' : 'TB';
+        } else if ((m = l.match(/^classDef\s+(\S+)\s+(.+)$/i))) for (const c of m[1].split(',')) classes[c] = mmStyle(m[2]);
+        else if ((m = l.match(/^class\s+(\S+)\s+(\S+)$/i))) for (const k of m[1].split(',')) nodeClass.push([k.trim(), m[2]]);
+        else if ((m = l.match(/^style\s+(\S+)\s+(.+)$/i))) nodeClass.push([m[1], null, mmStyle(m[2])]);
+        else if (/^(linkStyle|click|interpolate)\b/i.test(l)) {
+          if (!ignored) warn('kiểu đường nối / liên kết (linkStyle, click)');
+          ignored = true;
+        } else if (!statement(l)) warn(`dòng chưa hiểu: ${l.slice(0, 60)}`);
+      }
+    }
+    for (const [k, cls, st] of nodeClass) {
+      const n = G.nodes.get(k);
+      if (!n) continue;
+      n.style = Object.assign(n.style || {}, cls ? classes[cls] || {} : {}, st || {});
+    }
+    if (!G.nodes.size) throw new Error('Không tìm thấy hình nào trong lưu đồ');
+    return G;
+  }
+  /** Lật bố cục cho BT (dưới lên) / RL (phải sang trái) */
+  function mirror(g, dir) {
+    const vert = dir === 'TB';
+    const lo = Math.min(...g.nodes.map((n) => (vert ? n.y : n.x))), hi = Math.max(...g.nodes.map((n) => (vert ? n.y + n.h : n.x + n.w)));
+    g.nodes.forEach((n) => (vert ? (n.y = lo + hi - n.y - n.h) : (n.x = lo + hi - n.x - n.w)));
+    const flip = { top: 'bottom', bottom: 'top', left: 'right', right: 'left' };
+    g.edges.forEach((e) => {
+      if (vert) {
+        if (e.sourcePort === 'top' || e.sourcePort === 'bottom') e.sourcePort = flip[e.sourcePort];
+        if (e.targetPort === 'top' || e.targetPort === 'bottom') e.targetPort = flip[e.targetPort];
+      } else {
+        if (e.sourcePort === 'left' || e.sourcePort === 'right') e.sourcePort = flip[e.sourcePort];
+        if (e.targetPort === 'left' || e.targetPort === 'right') e.targetPort = flip[e.targetPort];
+      }
+    });
+  }
+
+  /** Mermaid -> diagram JSON: { ok, kind, doc, warnings } | { ok:false, kind, error } */
+  MM.convert = function (src) {
+    let M, kind = 'unknown';
+    try {
+      M = mmPrep(src);
+      kind = M.kind;
+      if (MM_OTHER[kind]) return { ok: false, kind, error: `Sơ đồ Mermaid loại ${MM_OTHER[kind]} không có dạng tương ứng trên whiteboard – chỉ sửa được bằng mã.` };
+      if (!MM.KIND_NAME[kind]) return { ok: false, kind, error: 'Không nhận ra loại sơ đồ Mermaid (chuyển được: flowchart / graph, sequenceDiagram, classDiagram, stateDiagram, erDiagram).' };
+      const warn = warner();
+      let g;
+      if (kind === 'flowchart') {
+        const G = mmFlow(M, warn);
+        g = layoutGraph(G, 'flowchart');
+        if (G.flip) mirror(g, G.dir);
+      } else if (kind === 'sequence') {
+        const lines = mmSequence(M, warn);
+        g = parseSequence({ lines, title: M.title }, warn);
+      } else {
+        const lines = kind === 'class' ? mmClass(M, warn) : kind === 'state' ? mmState(M, warn) : mmER(M, warn);
+        g = layoutGraph(parseGraph({ lines }, kind, warn), kind);
+      }
+      return finish(g, kind, M.title || MM.KIND_NAME[kind], kind === 'flowchart' ? 'flowchart' : 'uml', warn);
     } catch (e) {
       return { ok: false, kind, error: e.message || String(e) };
     }

@@ -1447,7 +1447,7 @@ d.addEventListener('submit',function(e){var f=e.target,k=f.getAttribute('data-su
     const links = [['Trang chủ', home.id], ['Giới thiệu', about.id], ['Liên hệ', contact.id]];
     const footer = () => PK.paletteItem('b-footer').build();
     home.children = [
-      ...navPreset('Studio Xanh', links),
+      ...navPreset('Studio TrungCTR', links),
       mk('section', { bg: '#eff6ff', padY: 96, align: 'center', gap: 20 }, [
         mk('heading', { text: 'Thiết kế trang web bằng kéo thả', level: '1', align: 'center', maxW: 760 }),
         mk('text', { text: 'Không cần biết code: kéo thành phần từ bên trái, chỉnh màu sắc, chữ, hiệu ứng ở bảng bên phải rồi bấm “Xem thử”.', align: 'center', fontSize: 18, color: '#475569', maxW: 640 }),
@@ -1457,7 +1457,7 @@ d.addEventListener('submit',function(e){var f=e.target,k=f.getAttribute('data-su
       ...footer(),
     ];
     about.children = [
-      ...navPreset('Studio Xanh', links),
+      ...navPreset('Studio TrungCTR', links),
       mk('section', { gap: 20, contentW: 900 }, [
         mk('heading', { text: 'Về chúng tôi', level: '1' }),
         mk('text', { text: 'Chúng tôi là một nhóm nhỏ yêu thích thiết kế đơn giản, dễ dùng. Dưới đây là đội ngũ của chúng tôi.', color: '#475569', fontSize: 17 }),
@@ -1467,8 +1467,8 @@ d.addEventListener('submit',function(e){var f=e.target,k=f.getAttribute('data-su
       ]),
       ...footer(),
     ];
-    contact.children = [...navPreset('Studio Xanh', links), ...PK.paletteItem('b-contact').build(), ...footer()];
-    return { kind: 'de-page', version: 1, name: 'Studio Xanh', theme: Object.assign({}, THEME_DEF), pages: [home, about, contact], script: '' };
+    contact.children = [...navPreset('Studio TrungCTR', links), ...PK.paletteItem('b-contact').build(), ...footer()];
+    return { kind: 'de-page', version: 1, name: 'Studio TrungCTR', theme: Object.assign({}, THEME_DEF), pages: [home, about, contact], script: '' };
   };
 
   // ============================================================ SKILL CHO AI
