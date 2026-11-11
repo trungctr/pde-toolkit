@@ -2,9 +2,12 @@
  * Markdown → HTML (CommonMark + GFM rút gọn, không thư viện ngoài) + làm sạch HTML.
  *
  * Hỗ trợ: tiêu đề ATX / setext (có id để làm mục lục), đoạn văn, xuống dòng cứng,
- * **đậm**, *nghiêng*, ~~gạch~~, `code`, khối code ``` / ~~~, trích dẫn (cả GitHub
- * alert > [!NOTE]), danh sách lồng nhau, task list, bảng GFM, đường kẻ, link, ảnh,
- * link tham chiếu, autolink, HTML nhúng (đã làm sạch).
+ * **đậm**, *nghiêng*, ~~gạch~~, ==tô sáng==, `code`, khối code ``` / ~~~, trích dẫn (GitHub
+ * alert > [!NOTE] và callout kiểu Obsidian > [!tip] Tiêu đề), danh sách lồng nhau, task list,
+ * bảng GFM, đường kẻ, link, ảnh, link tham chiếu, autolink, HTML nhúng (đã làm sạch),
+ * công thức $…$ / $$…$$ / ```math / $`…`$, sơ đồ ```mermaid, chú thích [^1],
+ * emoji :rocket:, mục lục [TOC], front matter YAML (--- … --- ở đầu file).
+ * Mermaid / công thức / tô màu code / emoji được vẽ sau bởi js/md-rich.js (tải thư viện từ CDN).
  *
  * Diagram nhúng: một dòng riêng dạng  [[diagram:<id>|Tên]]  được render thành
  * <figure class="md-diagram" data-dg="<id>"> rỗng – docs.js tự vẽ SVG vào đó.
@@ -67,21 +70,109 @@
 
   // ------------------------------------------------------------------- inline
   const INLINE_AS_TEXT = /^(script|style|textarea|title|xmp|plaintext|noscript|noembed|noframes|iframe|template|object|embed|applet|svg|math|select|option|button|form|input|base|meta|link|frame|frameset)$/i;
+
+  /** Công thức trong dòng: chữ TeX gốc hiện tạm cho tới khi md-rich.js vẽ bằng KaTeX */
+  const mathSpan = (tex, display) =>
+    `<span class="md-math${display ? ' md-math-inline-display' : ''}" contenteditable="false" data-tex="${esc(tex)}"${display ? ' data-display="1"' : ''}>${esc((display ? '$$' : '$') + tex + (display ? '$$' : '$'))}</span>`;
+
+  /**
+   * Quét trái → phải, tách code span và công thức ra trước mọi bước khác (TeX có rất nhiều
+   * \{ \_ \\ … – bước "ký tự thoát" chạy trước sẽ làm hỏng công thức). Quy tắc giống GitHub:
+   * $…$ không mở bằng / đóng bằng khoảng trắng, dấu đóng không dính chữ số; \$ là dấu $ thường.
+   */
+  function protectCodeMath(s, keep) {
+    let out = '', i = 0;
+    const n = s.length;
+    while (i < n) {
+      const c = s[i];
+      if (c === '\\' && i + 1 < n) {
+        out += s.slice(i, i + 2); // để bước "ký tự thoát" xử lý
+        i += 2;
+        continue;
+      }
+      // $`…`$ (cú pháp GitHub)
+      if (c === '$' && s[i + 1] === '`') {
+        const j = s.indexOf('`$', i + 2);
+        if (j > i + 2 && !s.slice(i + 2, j).includes('`')) {
+          out += keep(mathSpan(s.slice(i + 2, j), false));
+          i = j + 2;
+          continue;
+        }
+      }
+      // code span: chuỗi backtick mở phải gặp chuỗi đóng đúng độ dài
+      if (c === '`') {
+        let k = i;
+        while (s[k] === '`') k++;
+        const run = s.slice(i, k);
+        let j = k, found = -1;
+        while ((j = s.indexOf(run, j)) !== -1) {
+          if (s[j + run.length] !== '`') {
+            found = j;
+            break;
+          }
+          while (s[j] === '`') j++;
+        }
+        if (found >= 0) {
+          let code = s.slice(k, found).replace(/\n/g, ' ');
+          if (/^ .*[^ ].* $/.test(code)) code = code.slice(1, -1);
+          out += keep('<code>' + esc(code) + '</code>');
+          i = found + run.length;
+          continue;
+        }
+        out += run;
+        i = k;
+        continue;
+      }
+      if (c === '$') {
+        const disp = s[i + 1] === '$';
+        const o = disp ? 2 : 1;
+        const prev = i > 0 ? s[i - 1] : '';
+        if ((!disp && /[\p{L}\p{N}_$]/u.test(prev)) || /\s/.test(s[i + o] || ' ') || s[i + o] === '$') {
+          out += s.slice(i, i + o);
+          i += o;
+          continue;
+        }
+        let j = i + o, found = -1;
+        while (j < n) {
+          const ch = s[j];
+          if (ch === '\\') {
+            j += 2;
+            continue;
+          }
+          if (ch === '$') {
+            if (disp) {
+              if (s[j + 1] === '$' && !/\s/.test(s[j - 1])) found = j;
+            } else if (!/\s/.test(s[j - 1]) && !/[\p{N}]/u.test(s[j + 1] || '')) found = j;
+            break; // trong công thức trong dòng không có dấu $ chưa thoát
+          }
+          j++;
+        }
+        if (found > i + o) {
+          out += keep(mathSpan(s.slice(i + o, found), disp));
+          i = found + o;
+          continue;
+        }
+        out += s.slice(i, i + o);
+        i += o;
+        continue;
+      }
+      out += c;
+      i++;
+    }
+    return out;
+  }
+
   function inline(src, ctx) {
     const slots = [];
     const keep = (html) => '\u0000' + (slots.push(html) - 1) + '\u0000';
     let s = String(src).replace(/\u0000/g, '');
 
+    // code span + công thức
+    s = protectCodeMath(s, keep);
     // xuống dòng cứng bằng "\" cuối dòng
     s = s.replace(/\\\n/g, () => keep('<br>') + '\n');
     // ký tự thoát
-    s = s.replace(/\\([\\`*_{}[\]()#+\-.!|~<>"'=])/g, (_, c) => keep(esc(c)));
-    // code span
-    s = s.replace(/(`+)(?!`)([\s\S]*?[^`])\1(?!`)/g, (_, t, c) => {
-      c = c.replace(/\n/g, ' ');
-      if (/^ .*[^ ].* $/.test(c)) c = c.slice(1, -1);
-      return keep('<code>' + esc(c) + '</code>');
-    });
+    s = s.replace(/\\([\\`*_{}[\]()#+\-.!|~<>"'=$:^])/g, (_, c) => keep(esc(c)));
     // autolink <https://…> / <a@b.c>
     s = s.replace(/<((?:https?|ftp|mailto):[^\s<>]+)>/gi, (_, u) => keep(`<a href="${esc(safeUrl(u))}">${esc(u)}</a>`));
     s = s.replace(/<([^\s@<>()]+@[^\s@<>()]+\.[^\s@<>()]+)>/g, (_, u) => keep(`<a href="mailto:${esc(u)}">${esc(u)}</a>`));
@@ -93,6 +184,21 @@
       rawUsed = true;
       return keep(m);
     });
+
+    // chú thích [^id] (chỉ khi có định nghĩa [^id]: …)
+    if (ctx.fn && ctx.fn.defs.size)
+      s = s.replace(/\[\^([^\]\s]+)\]/g, (m, id) => {
+        const key = id.toLowerCase();
+        const d = ctx.fn.defs.get(key);
+        if (!d) return m;
+        if (!d.num) {
+          ctx.fn.order.push(key);
+          d.num = ctx.fn.order.length;
+        }
+        d.refs = (d.refs || 0) + 1;
+        const rid = 'fnref-' + d.fid + (d.refs > 1 ? '-' + d.refs : '');
+        return keep(`<sup class="md-fn-ref" contenteditable="false" data-fn="${esc(id)}"><a href="#fn-${d.fid}" id="${rid}">${d.num}</a></sup>`);
+      });
 
     const linkTail = String.raw`\(\s*(<[^>\n]*>|[^\s()]*(?:\([^\s()]*\)[^\s()]*)*)(?:\s+(?:"([^"]*)"|'([^']*)'))?\s*\)`;
     const unAngle = (u) => (u && u[0] === '<' ? u.slice(1, -1) : u || '');
@@ -120,6 +226,10 @@
     // URL trần (GFM autolink literal)
     s = s.replace(/(^|[\s(*_~])((?:https?:\/\/|www\.)[^\s<\u0000]*[^\s<.,:;"')\]*_~!?\u0000])/g, (_, pre, u) =>
       pre + keep(`<a href="${esc(/^www\./i.test(u) ? 'https://' + u : u)}">${esc(u)}</a>`)
+    );
+    // emoji :rocket: (md-rich.js đổi thành ký tự emoji theo bảng của GitHub; không có thì giữ chữ)
+    s = s.replace(/(^|[^\p{L}\p{N}_:/])(:([a-z0-9_+-]{1,40}):)(?![\p{L}\p{N}_:])/giu, (m, pre, all, sc) =>
+      pre + keep(`<span class="md-emoji" contenteditable="false" data-sc="${esc(sc.toLowerCase())}">${esc(all)}</span>`)
     );
 
     s = esc(s);
@@ -157,10 +267,40 @@
     setext: /^ {0,3}(=+|-+)[ \t]*$/,
     tableDelim: /^[ \t]*\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/,
     refDef: /^ {0,3}\[([^\]]+)\]:[ \t]*<?(\S+?)>?(?:[ \t]+(?:"([^"]*)"|'([^']*)'|\(([^)]*)\)))?[ \t]*$/,
+    fnDef: /^ {0,3}\[\^([^\]\s]+)\]:[ \t]?(.*)$/,
+    toc: /^ {0,3}(?:\[toc\]|\[\[_?toc_?\]\]|\$\{toc\})[ \t]*$/i,
+    mathOpen: /^ {0,3}\$\$(.*)$/,
   };
+
+  // callout: 5 loại của GitHub + các loại của Obsidian (quy về 5 kiểu hiển thị)
+  const ALERT = {
+    note: 'note', tip: 'tip', important: 'important', warning: 'warning', caution: 'caution',
+    info: 'note', abstract: 'note', summary: 'note', tldr: 'note', todo: 'note', quote: 'note', cite: 'note',
+    hint: 'tip', success: 'tip', check: 'tip', done: 'tip',
+    question: 'important', help: 'important', faq: 'important', example: 'important',
+    attention: 'warning', failure: 'caution', fail: 'caution', missing: 'caution', danger: 'caution', error: 'caution', bug: 'caution',
+  };
+  const ALERT_TITLE = {
+    note: 'Ghi chú', tip: 'Mẹo', important: 'Quan trọng', warning: 'Cảnh báo', caution: 'Thận trọng', info: 'Thông tin',
+    abstract: 'Tóm tắt', summary: 'Tóm tắt', tldr: 'Tóm tắt', todo: 'Việc cần làm', quote: 'Trích dẫn', cite: 'Trích dẫn',
+    hint: 'Gợi ý', success: 'Thành công', check: 'Đã kiểm tra', done: 'Đã xong', question: 'Câu hỏi', help: 'Trợ giúp',
+    faq: 'Hỏi đáp', example: 'Ví dụ', attention: 'Chú ý', failure: 'Thất bại', fail: 'Thất bại', missing: 'Còn thiếu',
+    danger: 'Nguy hiểm', error: 'Lỗi', bug: 'Lỗi phần mềm',
+  };
+
+  /** Khối Mermaid / công thức: trình soạn trực quan giữ nguyên mã gốc (data-raw) để chuyển ngược không mất gì */
+  function richBlock(kind, src, raw, L, ctx) {
+    const keepAttr = ctx.keepRaw ? ` contenteditable="false" data-raw="${esc(raw)}"` : '';
+    const cls = ctx.keepRaw ? 'md-raw ' : '';
+    if (kind === 'mermaid' || kind === 'plantuml')
+      return `<div class="${cls}md-${kind}" data-line="${L}" data-src="${esc(src)}"${keepAttr}><pre class="md-mermaid-src">${esc(src)}</pre></div>`;
+    return `<div class="${cls}md-math-block" data-line="${L}"${keepAttr}><span class="md-math" data-display="1" data-tex="${esc(src)}">${esc(src)}</span></div>`;
+  }
 
   const startsBlock = (l, next) =>
     RE.fence.test(l) ||
+    RE.toc.test(l) ||
+    /^ {0,3}\$\$/.test(l) ||
     RE.heading.test(l) ||
     RE.hr.test(l) ||
     RE.quote.test(l) ||
@@ -216,14 +356,56 @@
         continue;
       }
 
+      // mục lục tự động [TOC] (điền ở cuối MD.render khi đã biết mọi tiêu đề)
+      if (RE.toc.test(line)) {
+        ctx.hasToc = true;
+        out.push(`<nav class="${ctx.keepRaw ? 'md-raw ' : ''}md-toc" data-line="${L}"${ctx.keepRaw ? ` contenteditable="false" data-raw="${esc(line.trim())}"` : ''}>\u0001TOC\u0001</nav>`);
+        i++;
+        continue;
+      }
+
+      // công thức riêng một khối: $$ … $$ (một hoặc nhiều dòng)
+      if ((m = line.match(RE.mathOpen))) {
+        const rest = m[1];
+        let end = -1, tex = '';
+        const one = rest.match(/^(.*?)\$\$[ \t]*$/);
+        if (one) {
+          if (one[1].trim()) {
+            end = i;
+            tex = one[1].trim();
+          }
+        } else if (!rest.includes('$$')) {
+          for (let j = i + 1; j < n && j < i + 400; j++) {
+            const cm = lines[j].match(/^(.*?)\$\$[ \t]*$/);
+            if (cm) {
+              end = j;
+              tex = [rest, ...lines.slice(i + 1, j), cm[1]].join('\n').trim();
+              break;
+            }
+          }
+        }
+        if (end >= 0 && tex) {
+          out.push(richBlock('math', tex, lines.slice(i, end + 1).join('\n'), L, ctx));
+          i = end + 1;
+          continue;
+        }
+      }
+
       // khối code có rào
       if ((m = line.match(RE.fence))) {
         const ind = m[1].length, fence = m[2], lang = m[3] || '';
+        const start = i;
         const body = [];
         i++;
         const close = new RegExp(`^ {0,3}${fence[0] === '`' ? '`' : '~'}{${fence.length},}[ \\t]*$`);
         while (i < n && !close.test(lines[i])) body.push(dedent(lines[i++], ind));
         i++; // bỏ dòng đóng
+        const lg = lang.toLowerCase();
+        if (lg === 'mermaid' || lg === 'math' || lg === 'plantuml' || lg === 'puml' || lg === 'uml') {
+          const kind = lg === 'mermaid' || lg === 'math' ? lg : 'plantuml';
+          out.push(richBlock(kind, body.join('\n'), lines.slice(start, Math.min(i, n)).join('\n'), L, ctx));
+          continue;
+        }
         const cls = lang ? ` class="language-${esc(lang)}"` : '';
         out.push(`<pre${at}${lang ? ` data-lang="${esc(lang)}"` : ''}><code${cls}>${esc(body.join('\n'))}${body.length ? '\n' : ''}</code></pre>`);
         continue;
@@ -251,11 +433,15 @@
           body.push(lines[i].replace(/^ {0,3}> ?/, ''));
           i++;
         }
-        const am = body[0] && body[0].match(/^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\][ \t]*$/i);
-        if (am) {
-          const kind = am[1].toLowerCase();
-          const title = { note: 'Ghi chú', tip: 'Mẹo', important: 'Quan trọng', warning: 'Cảnh báo', caution: 'Thận trọng' }[kind];
-          out.push(`<div${at} class="md-alert md-alert-${kind}"><p class="md-alert-title">${title}</p>${blocks(body.slice(1), L + 1, ctx)}</div>`);
+        // > [!NOTE] (GitHub) · > [!tip]- Tiêu đề riêng (Obsidian: dấu - / + là thu gọn / mở sẵn)
+        const am = body[0] && body[0].match(/^\[!([A-Za-z]+)\]([-+]?)(?:[ \t]+(.*?))?[ \t]*$/);
+        if (am && ALERT[am[1].toLowerCase()]) {
+          const t = am[1].toLowerCase(), kind = ALERT[t];
+          const title = am[3] ? inline(am[3], ctx) : esc(ALERT_TITLE[t]);
+          const attrs = ` data-type="${esc(am[1])}"${am[2] ? ` data-fold="${am[2]}"` : ''}${am[3] ? ` data-title="${esc(am[3])}"` : ''}`;
+          out.push(
+            `<div${at} class="md-alert md-alert-${kind}"${attrs}><p class="md-alert-title"${ctx.keepRaw ? ' contenteditable="false"' : ''}>${title}</p>${blocks(body.slice(1), L + 1, ctx)}</div>`
+          );
         } else out.push(`<blockquote${at}>${blocks(body, L, ctx)}</blockquote>`);
         continue;
       }
@@ -403,10 +589,77 @@
    * Render Markdown. opt.diagram(id, line, name) -> HTML cho dòng [[diagram:…]].
    * Trả về HTML CHƯA làm sạch – gọi MD.sanitize trước khi gán innerHTML.
    */
+  /** Front matter YAML: hiện thành bảng khoá – giá trị (như GitHub), giữ nguyên mã gốc */
+  function frontMatterHTML(body, raw, keepRaw) {
+    const rows = [];
+    for (const l of body) {
+      const m = l.match(/^([A-Za-z_][\w .-]*?)[ \t]*:(?:[ \t]+(.*))?$/);
+      if (m) rows.push([m[1], (m[2] || '').trim()]);
+      else if (rows.length && l.trim()) {
+        const v = l.trim().replace(/^-[ \t]+/, '');
+        const last = rows[rows.length - 1];
+        last[1] += (last[1] ? ', ' : '') + v;
+      }
+    }
+    const unq = (v) => v.replace(/^(["'])([\s\S]*)\1$/, '$2');
+    const cells = rows.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(unq(v))}</td></tr>`).join('');
+    return (
+      `<div class="${keepRaw ? 'md-raw ' : ''}md-frontmatter" data-line="0"${keepRaw ? ` contenteditable="false" data-raw="${esc(raw)}"` : ''}>` +
+      `<table><tbody>${cells || `<tr><td>${esc(body.join('\n'))}</td></tr>`}</tbody></table></div>`
+    );
+  }
+
   MD.render = function (src, opt = {}) {
-    const lines = String(src || '').replace(/\r\n?/g, '\n').split('\n');
-    const refs = new Map();
+    const lines = String(src || '').replace(/\r\n?/g, '\n').replace(/\u0001/g, '').split('\n');
+
+    // front matter --- … --- ở đầu file
+    let fmHtml = '';
+    if (/^---[ \t]*$/.test(lines[0] || '')) {
+      for (let j = 1; j < Math.min(lines.length, 300); j++) {
+        if (!/^(---|\.\.\.)[ \t]*$/.test(lines[j])) continue;
+        const body = lines.slice(1, j);
+        if (body.some((l) => /^[A-Za-z_][\w .-]*:(\s|$)/.test(l))) {
+          fmHtml = frontMatterHTML(body, lines.slice(0, j + 1).join('\n'), !!opt.keepRaw);
+          for (let k = 0; k <= j; k++) lines[k] = '';
+        }
+        break;
+      }
+    }
+
+    // định nghĩa chú thích [^id]: … (+ các dòng thụt vào phía sau) -> gom về cuối tài liệu
+    const fn = { defs: new Map(), order: [], raw: [], last: 0 };
     let inFence = null;
+    for (let k = 0; k < lines.length; k++) {
+      const l = lines[k];
+      const f = l.match(RE.fence);
+      if (f && (!inFence || f[2][0] === inFence[0])) {
+        inFence = inFence ? null : f[2];
+        continue;
+      }
+      if (inFence) continue;
+      const m = l.match(RE.fnDef);
+      if (!m) continue;
+      const body = [m[2]], raw = [l];
+      let j = k + 1;
+      while (j < lines.length) {
+        if (/^( {2,}|\t)\S/.test(lines[j])) {
+          body.push(dedent(lines[j], Math.min(4, indentOf(lines[j]))));
+          raw.push(lines[j++]);
+        } else if (BLANK.test(lines[j]) && /^( {4}|\t)\S/.test(lines[j + 1] || '')) {
+          body.push('');
+          raw.push(lines[j++]);
+        } else break;
+      }
+      const key = m[1].toLowerCase();
+      if (!fn.defs.has(key)) fn.defs.set(key, { id: m[1], fid: m[1].replace(/[^\p{L}\p{N}_-]/gu, '_'), body, line: k, num: 0 });
+      fn.raw.push(raw.join('\n'));
+      fn.last = j - 1;
+      for (let q = k; q < j; q++) lines[q] = '';
+      k = j - 1;
+    }
+
+    const refs = new Map();
+    inFence = null;
     for (const l of lines) {
       const f = l.match(RE.fence);
       if (f && (!inFence || f[2][0] === inFence[0])) inFence = inFence ? null : f[2];
@@ -417,18 +670,53 @@
         if (!refs.has(k)) refs.set(k, { url: m[2], title: m[3] || m[4] || m[5] || '' });
       }
     }
-    const ctx = { refs, ids: new Set(), diagram: opt.diagram, keepRaw: !!opt.keepRaw };
-    return blocks(lines, 0, ctx);
+    const ctx = { refs, ids: new Set(), diagram: opt.diagram, keepRaw: !!opt.keepRaw, fn, hasToc: false };
+    let html = fmHtml + blocks(lines, 0, ctx);
+
+    // khu chú thích ở cuối (đánh số theo thứ tự xuất hiện lần đầu)
+    if (fn.defs.size) {
+      const used = fn.order.map((k) => fn.defs.get(k));
+      const rest = [...fn.defs.values()].filter((d) => !d.num);
+      const items = used
+        .concat(rest)
+        .map((d) => {
+          const back = d.num ? ` <a href="#fnref-${d.fid}" class="md-fn-back" aria-label="Quay lại chỗ tham chiếu">↩</a>` : '';
+          return `<li id="fn-${d.fid}" data-line="${d.line}">${blocks(d.body, d.line, ctx, true)}${back}</li>`;
+        })
+        .join('');
+      const keep = ctx.keepRaw ? ` contenteditable="false" data-raw="${esc(fn.raw.join('\n'))}"` : '';
+      html += `\n<section class="${ctx.keepRaw ? 'md-raw ' : ''}md-footnotes" data-line="${fn.last}"${keep}><p class="md-fn-title">Chú thích</p><ol>${items}</ol></section>`;
+    }
+
+    // mục lục [TOC]
+    if (ctx.hasToc) {
+      const heads = [];
+      html.replace(/<h([1-6])[^>]*?\sid="([^"]*)"[^>]*>([\s\S]*?)<\/h\1>/g, (_, lv, id, inner) => {
+        heads.push({ lv: +lv, id, text: inner.replace(/<[^>]*>/g, '').trim() });
+        return '';
+      });
+      const min = heads.length ? Math.min(...heads.map((h) => h.lv)) : 1;
+      const list = heads.length
+        ? '<ul class="md-toc-list">' + heads.map((h) => `<li class="md-toc-l${h.lv - min + 1}"><a href="#${h.id}">${h.text}</a></li>`).join('') + '</ul>'
+        : '<p class="md-toc-empty">Chưa có tiêu đề nào trong tài liệu.</p>';
+      html = html.replace(/\u0001TOC\u0001/g, '<p class="md-toc-title">Mục lục</p>' + list);
+    }
+    return html;
   };
 
   /** Danh sách tiêu đề (cho mục lục): [{ level, text, line }] */
   MD.headings = function (src) {
     const out = [];
     let fence = null;
-    String(src || '')
-      .replace(/\r\n?/g, '\n')
-      .split('\n')
-      .forEach((l, i) => {
+    const all = String(src || '').replace(/\r\n?/g, '\n').split('\n');
+    // bỏ qua front matter (dòng "# …" trong YAML là chú thích, không phải tiêu đề)
+    let skip = 0;
+    if (/^---[ \t]*$/.test(all[0] || '')) {
+      const j = all.findIndex((l, k) => k > 0 && k < 300 && /^(---|\.\.\.)[ \t]*$/.test(l));
+      if (j > 0 && all.slice(1, j).some((l) => /^[A-Za-z_][\w .-]*:(\s|$)/.test(l))) skip = j + 1;
+    }
+    all.forEach((l, i) => {
+        if (i < skip) return;
         const f = l.match(RE.fence);
         if (f && (!fence || f[2][0] === fence[0])) fence = fence ? null : f[2];
         if (fence || f) return;
@@ -557,13 +845,17 @@
   const KEEP_INLINE = new Set(['KBD', 'SUB', 'SUP', 'U', 'INS', 'SMALL', 'ABBR', 'Q', 'VAR', 'SAMP']);
   const ZW = /[\u200b\u200c\u200d\ufeff]/g;
 
-  const escText = (t) =>
-    t
+  const escText = (t) => {
+    let s = t
       .replace(ZW, '')
       .replace(/ /g, ' ')
       .replace(/([\\`*_[\]~])/g, '\\$1')
       .replace(/<(?=[A-Za-z/!?])/g, '\\<')
       .replace(/==/g, '=\\=');
+    // hai dấu $ trở lên trong cùng đoạn chữ có thể bị hiểu thành công thức -> thoát
+    if ((s.match(/\$/g) || []).length > 1) s = s.replace(/\$/g, '\\$');
+    return s;
+  };
 
   /** bọc dấu nhấn mạnh, đẩy khoảng trắng đầu/cuối ra ngoài (** a ** không hợp lệ) */
   const wrapMark = (mark, inner) => {
@@ -582,6 +874,21 @@
       if (c.nodeType !== 1) return;
       const tag = c.tagName.toUpperCase();
       if (c.classList.contains('dg-actions')) return;
+      // công thức / emoji / chú thích: đọc lại mã gốc từ thuộc tính (nội dung đã được vẽ lại)
+      if (c.classList.contains('md-math')) {
+        const t = c.getAttribute('data-tex') || '';
+        if (c.getAttribute('data-display')) out += '$$' + t + '$$';
+        else out += t.includes('$') && !t.includes('`') ? '$`' + t + '`$' : '$' + t + '$';
+        return;
+      }
+      if (c.classList.contains('md-emoji')) {
+        out += ':' + (c.getAttribute('data-sc') || '') + ':';
+        return;
+      }
+      if (c.classList.contains('md-fn-ref')) {
+        out += '[^' + (c.getAttribute('data-fn') || '') + ']';
+        return;
+      }
       if (BLOCK_TAGS.has(tag)) {
         // khối lạc trong dòng (dán từ nơi khác) -> xuống dòng
         const t = inlineMd(c, o).trim();
@@ -727,7 +1034,9 @@
           const kids = document.createElement('div');
           [...el.childNodes].filter((n) => !(n.nodeType === 1 && n.classList.contains('md-alert-title'))).forEach((n) => kids.appendChild(n.cloneNode(true)));
           const inner = blocksMd(kids, o).join('\n\n');
-          return `> [!${kind.toUpperCase()}]` + (inner ? '\n' + prefixLines(inner, '> ') : '');
+          const type = el.getAttribute('data-type') || kind.toUpperCase();
+          const title = el.getAttribute('data-title');
+          return `> [!${type}]${el.getAttribute('data-fold') || ''}${title ? ' ' + title : ''}` + (inner ? '\n' + prefixLines(inner, '> ') : '');
         }
         if (el.classList.contains('md-table')) return blocksMd(el, o).join('\n\n');
         return blocksMd(el, o).join('\n\n');

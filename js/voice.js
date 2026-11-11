@@ -1192,7 +1192,7 @@ registerProcessor('de-mic', DEMic);
         } else say = phrase('idle');
         break;
       case 'voice-settings':
-        V.settingsDialog();
+        openSettings();
         return;
       case 'mode':
         await H.requestMode(cmd.arg);
@@ -1241,16 +1241,23 @@ registerProcessor('de-mic', DEMic);
   V.toggleHandsFree = () => setHandsFree(!handsFree);
 
   // ================================================================ CÀI ĐẶT
-  V.settingsDialog = function () {
+  /** Mở phần cài đặt giọng nói: tab Cài đặt nếu app có, không thì hộp thoại */
+  const openSettings = () => (H && H.openSettings ? H.openSettings('voice') : V.settingsDialog());
+  V.settingsDialog = () => mountForm(null);
+  /** Form cài đặt giọng nói nằm ngay trong tab Cài đặt (đổi là lưu luôn). Trả về { dispose } */
+  V.settingsForm = (host) => mountForm(host);
+  function mountForm(host) {
+    const inline = !!host;
     const c = cfg();
     const esc = DE.esc;
     const opts = (o, v) => Object.entries(o).map(([k, n]) => `<option value="${k}"${k === v ? ' selected' : ''}>${esc(n)}</option>`).join('');
     const cmdRows = V.COMMANDS.map((x) => `<tr><td>${esc(x.label)}</td><td>${x.say.map((s) => '“' + esc(s) + '”').join(', ')}</td></tr>`).join('');
     const back = document.createElement('div');
-    back.className = 'modal-backdrop';
+    back.className = inline ? 'voice-inline' : 'modal-backdrop';
     back.innerHTML =
-      `<div class="modal ai-modal voice-modal" role="dialog" aria-modal="true" aria-labelledby="voice-title">` +
-      `<h3 id="voice-title">Cài đặt giọng nói</h3>` +
+      (inline
+        ? `<div class="voice-form">`
+        : `<div class="modal ai-modal voice-modal" role="dialog" aria-modal="true" aria-labelledby="voice-title"><h3 id="voice-title">Cài đặt giọng nói</h3>`) +
       `<label class="f"><span>Bộ nhận dạng</span><select id="v-engine">${opts(V.ENGINES, c.engine)}</select></label>` +
       `<div id="v-engine-info" class="msg v-info"></div>` +
       `<div class="f"><span>Micro</span><div class="v-microw"><select id="v-mic"></select>` +
@@ -1266,7 +1273,9 @@ registerProcessor('de-mic', DEMic);
       `<div id="v-voice-info" class="msg"></div>` +
       `<p class="hint v-credit">Giọng đọc online: <a href="https://responsivevoice.org" target="_blank" rel="noopener">ResponsiveVoice-NonCommercial</a> licensed under <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/" target="_blank" rel="noopener">CC BY-NC-ND 4.0</a></p>` +
       `<p class="hint">Phím tắt: <b>Ctrl+M</b> nói một câu · <b>Ctrl+Shift+M</b> bật / tắt rảnh tay · <b>Esc</b> huỷ khi đang nghe.</p>` +
-      `<div class="modal-actions"><button class="btn" data-r="cancel">Huỷ</button><button class="btn primary" data-r="apply">Áp dụng</button></div></div>`;
+      (inline
+        ? `<div class="set-actions"><span class="msg ok" id="v-saved" aria-live="polite"></span></div></div>`
+        : `<div class="modal-actions"><button class="btn" data-r="cancel">Huỷ</button><button class="btn primary" data-r="apply">Áp dụng</button></div></div>`);
     const q = (s) => back.querySelector(s);
     const draftCfg = () => ({
       engine: q('#v-engine').value,
@@ -1356,12 +1365,25 @@ registerProcessor('de-mic', DEMic);
         );
       q('#v-voice-info').textContent = lines.join('\n');
     }
+    let disposed = false;
     const close = () => {
-      window.removeEventListener('keydown', onKey, true);
+      if (disposed) return;
+      disposed = true;
+      if (!inline) window.removeEventListener('keydown', onKey, true);
       stopMicTest();
       if (navigator.mediaDevices && navigator.mediaDevices.removeEventListener) navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange);
-      V.onVoices = null;
+      if (V.onVoices === renderVoices) V.onVoices = null;
       back.remove();
+    };
+    // trong tab Cài đặt: đổi gì lưu nấy
+    let savedT = 0;
+    const autosave = () => {
+      if (!inline) return;
+      V.save(Object.assign(cfg(), draftCfg()));
+      const el = q('#v-saved');
+      el.textContent = '✓ Đã lưu';
+      clearTimeout(savedT);
+      savedT = setTimeout(() => (el.textContent = ''), 1800);
     };
     const onKey = (e) => {
       e.stopPropagation();
@@ -1377,10 +1399,11 @@ registerProcessor('de-mic', DEMic);
         renderVoices();
         renderEngineInfo();
       } else if (e.target.id === 'v-engine') renderEngineInfo();
+      autosave();
     });
     back.addEventListener('click', (e) => {
       const b = e.target.closest('[data-r]');
-      if ((b && b.dataset.r === 'cancel') || e.target === back) return close();
+      if ((b && b.dataset.r === 'cancel') || (!inline && e.target === back)) return close();
       if (!b) return;
       if (b.dataset.r === 'mictest') {
         if (micTest) stopMicTest();
@@ -1411,13 +1434,17 @@ registerProcessor('de-mic', DEMic);
       }
     });
     V.onVoices = renderVoices;
-    window.addEventListener('keydown', onKey, true);
-    document.body.appendChild(back);
+    if (inline) host.appendChild(back);
+    else {
+      window.addEventListener('keydown', onKey, true);
+      document.body.appendChild(back);
+    }
     renderVoices();
     renderEngineInfo();
     renderMics();
-    q('#v-engine').focus();
-  };
+    if (!inline) q('#v-engine').focus();
+    return { dispose: close };
+  }
 
   // ================================================================== INIT
   V.init = function (hooks) {
@@ -1436,7 +1463,7 @@ registerProcessor('de-mic', DEMic);
       }
       mic.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        V.settingsDialog();
+        openSettings();
       });
     }
     // Ctrl+M / Ctrl+Shift+M / Esc – bắt ở pha capture để dùng được cả khi đang gõ trong ô chat

@@ -54,7 +54,8 @@ mới hoạt động.
 - **Sequence diagram**: message gắn tự do theo trục dọc lifeline / activation, tự bắt thẳng hàng ngang.
 - **Container** (Pool, Lane, Package, Frame, Group…): kéo container sẽ kéo theo các hình bên trong.
 - **Thu gọn panel**: nút ‹ › ở mép canvas hoặc `Ctrl+B` / `Ctrl+Alt+B`; diagram đứng yên khi panel co giãn.
-- **Chế độ tối**: chỉ làm tối giao diện, whiteboard chỉ dịu bớt độ trắng (không đen), hình giữ nguyên màu.
+- **Sáng / tối / theo hệ thống** (tab ⚙ Cài đặt → Giao diện): chế độ tối chỉ làm tối giao diện, whiteboard chỉ dịu bớt
+  độ trắng (không đen), hình giữ nguyên màu.
 
 ### JSON, mở và lưu
 
@@ -78,20 +79,37 @@ Nút **Nhúng SVG** tạo đoạn mã dán thẳng vào file `.md`, không cần
 
 ### PWA
 
-Cài như ứng dụng (nút “Cài đặt ứng dụng” ở thanh trạng thái hoặc biểu tượng cài trên thanh địa chỉ), chạy
-offline nhờ service worker (network-first), mở file `.json` trực tiếp từ hệ điều hành khi đã cài.
+Cài như ứng dụng (tab ⚙ Cài đặt → Ứng dụng & dữ liệu → **Cài đặt ứng dụng**, hoặc biểu tượng cài trên thanh địa chỉ),
+chạy offline nhờ service worker (network-first), mở file `.json` trực tiếp từ hệ điều hành khi đã cài.
+
+### Tab Cài đặt
+
+Mọi cài đặt chung gom vào tab **⚙ Cài đặt** (góc phải thanh tab, `Alt+5`) thay vì rải trên toolbar và khung chat.
+Cột trái có 4 nhóm; nhóm vừa xem được nhớ lại, nút **← Quay lại** đưa về tab đang làm. Khung chat AI ẩn ở tab này.
+
+| Nhóm | Nội dung | Lưu |
+| --- | --- | --- |
+| Giao diện | Sáng · Tối · Theo hệ thống (theo `prefers-color-scheme`, tự đổi khi máy đổi) – thẻ chọn có hình xem trước | Ngay khi chọn |
+| Trợ lý AI | Trạng thái đang dùng; nhà cung cấp, API key, mô hình (cùng form với hộp thoại cũ, nay nằm trong trang); effort, thinking | Nút **Lưu cài đặt AI** (có báo “chưa lưu” + **Bỏ thay đổi**); effort / thinking lưu ngay |
+| Giọng nói | Bộ nhận dạng, micro (thử micro), ngôn ngữ, lệnh giọng nói, phản hồi bằng giọng nói, xưng hô, giọng đọc | Ngay khi đổi |
+| Ứng dụng & dữ liệu | Cài như ứng dụng, trạng thái chạy offline, dung lượng `localStorage` theo từng loại dữ liệu, phím tắt chung | – |
+
+Lối tắt vẫn còn: nút cài đặt ở góc khung chat (chấm xanh = đã có key, cam = chưa) và mục “⚙ Cài đặt AI…” trong dropdown mô
+hình mở thẳng nhóm Trợ lý AI; chuột phải vào 🎤 hoặc lệnh giọng nói “cài đặt giọng nói” mở nhóm Giọng nói. Gửi chat khi chưa có
+key thì hộp thoại cài đặt AI mở ngay tại chỗ để gửi tiếp được luôn. Mã nguồn: `js/settings.js` (khung trang, giao diện,
+ứng dụng); form AI là `DE.ui.aiForm(host)` trong `js/ui.js`, form giọng nói là `DE.voice.settingsForm(host)` trong `js/voice.js`.
 
 ## Tài liệu Markdown
 
-App có bốn tab ở trên cùng: **Tài liệu** (soạn / xem file `.md`, `Alt+1`), **Diagram** (whiteboard, `Alt+2`),
-**Thiết kế trang** (dựng trang web bằng kéo thả, `Alt+3`) và **Hướng dẫn** (hướng dẫn sử dụng có mục lục, tìm kiếm và
-ví dụ gửi thẳng vào chat AI, `Alt+4`). Diagram luôn được
+App có năm tab ở trên cùng: **Tài liệu** (soạn / xem file `.md`, `Alt+1`), **Diagram** (whiteboard, `Alt+2`),
+**Thiết kế trang** (dựng trang web bằng kéo thả, `Alt+3`), **Hướng dẫn** (hướng dẫn sử dụng có mục lục, tìm kiếm và
+ví dụ gửi thẳng vào chat AI, `Alt+4`) và **⚙ Cài đặt** (góc phải, `Alt+5`). Diagram luôn được
 vẽ ở tab Diagram rồi nhúng vào tài liệu; muốn sửa thì mở lại diagram đó ở tab Diagram.
 
 Thanh công cụ chia theo nhóm; khi màn hình hẹp, các nhóm tự xuống hàng – không nút nào bị ẩn.
 
 ```text
-[ 📄 Tài liệu · thiet-ke.md ● ] [ ◆ Diagram  mới ]                        Alt+1 Tài liệu · Alt+2 Diagram
+[ 📄 Tài liệu · thiet-ke.md ● ] [ ◆ Diagram  mới ] …          Alt+1 … Alt+5 chuyển tab  [ ⚙ Cài đặt ]
 ┌─────────────────────────────────┬──────────────────────────────────────────┐
 │ # Thiết kế                      │ Thiết kế                                 │
 │                                 │ ─────────                                │
@@ -131,6 +149,58 @@ Thanh công cụ chia theo nhóm; khi màn hình hẹp, các nhóm tự xuống 
 
 Khi vẽ / sửa diagram cho tài liệu, diagram bạn đang vẽ dở ở tab Diagram được **cất lại kèm lịch sử undo** và trả
 về nguyên vẹn khi bấm ✓ hoặc **Huỷ**. Đang vẽ dở mà tải lại trang thì phiên vẽ vẫn được khôi phục.
+
+### Công thức, Mermaid, chú thích và các cú pháp mở rộng
+
+Tab Tài liệu hiển thị các phần mở rộng phổ biến của GitHub / VS Code / Obsidian / Typora. Phần dựng nằm trong
+`js/markdown.js`; phần vẽ nằm trong `js/md-rich.js`, chỉ **tải thư viện từ CDN khi tài liệu cần**:
+
+| Cú pháp | Hiển thị | Thư viện (jsDelivr, có SRI) |
+| --- | --- | --- |
+| ```` ```mermaid ```` | Sơ đồ Mermaid (lưu đồ, tuần tự, Gantt, pie, mindmap, class, state, ER, journey, timeline, gitGraph, quadrant…) | `mermaid@11.4.1` |
+| `$…$`, `` $`…`$ ``, `$$ … $$`, ```` ```math ```` | Công thức LaTeX | `katex@0.16.11` |
+| ```` ```js ````, ```` ```python ````… | Tô màu cú pháp (~40 ngôn ngữ phổ biến) | `@highlightjs/cdn-assets@11.10.0` |
+| `:rocket:` | Emoji theo bảng shortcode của GitHub | `emojibase-data@15.3.2` |
+| `[^1]` + `[^1]: …` | Chú thích cuối trang có liên kết qua lại | – |
+| `[TOC]` (cả `[[toc]]`, `[[_TOC_]]`, `${toc}`) | Mục lục tự động | – |
+| `---` … `---` ở đầu file | Bảng front matter (YAML) | – |
+| `> [!NOTE]` … `> [!CAUTION]`, `> [!tip]- Tiêu đề` | Hộp ghi chú GitHub + callout Obsidian (27 loại, tiêu đề riêng) | – |
+| `==chữ==` | Tô sáng | – |
+
+- **An toàn**: mỗi file từ CDN có mã kiểm tra toàn vẹn (`integrity`), bị sửa là trình duyệt từ chối. Mermaid chạy với
+  `securityLevel: 'strict'`; sơ đồ được chèn bằng `<img src="data:image/svg+xml;base64,…">` nên SVG không thể chạy
+  script. KaTeX chạy với `trust: false` (không có `\href`, `\html…`).
+- **Offline**: service worker lưu các file CDN (URL có số phiên bản) vào cache riêng `diagram-editor-cdn-v1`. Chưa tải
+  được thì tài liệu vẫn hiện mã gốc.
+- **Trình soạn trực quan**: các khối này không sửa trực tiếp (giữ mã gốc trong `data-raw`). Nhấn đúp hoặc dùng nút trên
+  thanh công cụ (**∑**, **Mermaid**, **[1]**, mục lục) để mở hộp thoại sửa có xem trước. Chuyển ngược sang Markdown
+  không mất gì.
+- **Xuất HTML**: sơ đồ Mermaid nhúng dạng ảnh SVG, công thức dạng **MathML** (không cần CSS / font của KaTeX), code đã
+  tô màu – file chạy độc lập, không cần mạng.
+
+### PlantUML – dịch sang diagram, không cần máy chủ
+
+Trình xem khác thường gửi mã PlantUML lên máy chủ (plantuml.com / Kroki) để lấy ảnh. Ở đây `js/plantuml.js` **dịch**
+mã PlantUML thành JSON diagram của whiteboard rồi vẽ bằng chính bộ vẽ SVG của app – không gửi gì ra ngoài, chạy offline.
+
+| Loại | Cú pháp nhận được | Thành |
+| --- | --- | --- |
+| Sequence | `participant` / `actor` / `database`…, `->` `-->` `->>`, `activate`, `alt` / `else` / `loop` / `opt`…, `note`, `autonumber`, `return`, `== … ==` | lifeline, activation, message (neo đúng hàng), fragment |
+| Use case | `actor`, `usecase` / `(…)`, `rectangle` (biên hệ thống), `<<include>>` / `<<extend>>`, `<\|--`, `left to right direction` | actor, use case, biên hệ thống, include / extend / generalization |
+| Class | `class` / `interface` / `enum` / `abstract`, thành viên `{ … }`, `<\|--` `<\|..` `*--` `o--` `-->` `..>`, bội số `"1" -- "*"`, `package` | lớp 3 ngăn, đủ 6 loại quan hệ |
+| Activity | cú pháp mới (`:bước;`, `if` / `elseif` / `else`, `while`, `repeat`, `fork`, `\|Làn\|`) và cú pháp cũ (`(*) -->`, `if "" then`) | start / end, action, decision, fork / join, làn bơi, vòng lặp đi vòng bên trái |
+| State | `[*]`, `state X { … }` (trạng thái lồng), `X : entry / …`, `<<choice>>` / `<<fork>>` | state, composite, initial / final, choice |
+| Component / Deployment | `component` / `[X]`, `interface` / `()`, `node`, `database`, `cloud`, `package`, `folder`… | component, interface, node lồng nhau |
+| ER | `entity X { * id : int <<PK>> … }`, `\|\|--o{` `}\|..\|{`… | bảng ERD, đầu chân chim đúng ký hiệu |
+
+- **Dàn trang**: sequence xếp theo hàng; activity dựng theo khối lồng nhau (nhánh, vòng lặp, làn); các loại còn lại dùng
+  dàn trang phân tầng (phá chu trình, xếp tầng, giảm cắt chéo bằng barycenter, khung chứa lồng nhau, cạnh ngược đi cổng bên).
+- **Bỏ qua có báo**: `skinparam`, màu, `!include`… được bỏ qua và liệt kê thành cảnh báo. Loại chưa hỗ trợ (mindmap,
+  gantt, wireframe…) trả về thông báo rõ ràng, tài liệu hiện mã gốc.
+- **An toàn**: kết quả đi qua `DE.normalizeDoc` như mọi JSON khác; chữ luôn được thoát nên SVG chèn thẳng vào trang.
+- **Dùng ở đâu**: khối ```` ```plantuml ```` / ```` ```puml ```` trong tài liệu (dán mã `@startuml` thô cũng tự bọc), file
+  `.puml` / `.plantuml` / `.pu` / `.iuml` / `.wsd` (nút Mở, kéo thả), hoặc dán mã vào tab JSON. Nút **◆ Sửa trên whiteboard**
+  chuyển khối thành diagram nhúng để sửa kéo thả.
 
 ### Định dạng trong file `.md`
 
@@ -255,22 +325,37 @@ phần) được thêm vào mà không xoá lịch sử. Mỗi tin nhắn gửi 
 `[[diagram:…]]` + JSON của chúng), diagram đang mở, hoặc dự án trang đang mở.
 
 ```text
-[ Claude ● ] [ Copy context ] [ mô hình ▾ ] [ Effort: … ▾ ] [ 💡 Thinking: bật ]      Lượt 2  ↻  —
 ┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│ 🗑 Xoá hội thoại  2 lượt                                    ⇕ thu gọn tin nhắn  ⤡ thu nhỏ │
+│                                                     ┌──────────────────────────────────┐ │
+│                                                     │ Viết đặc tả đăng nhập            │ │
+│ ┌ XONG · TÀI LIỆU ─────────────────────────────┐    └──────────────────────────────────┘ │
+│ │ Đã viết đặc tả đăng nhập…                     │                                        │
+│ │ [ ↶ Hoàn tác thay đổi của AI ]                │      (lịch sử hỏi – đáp, cuộn được)    │
+│ └───────────────────────────────────────────────┘                                        │
+│ [ mô hình ▾ ] [ Copy context ]                                                       ⚙●  │
 │ Hỏi AI về diagram này…                                            🎤  🎧  [ Gửi Ctrl ↵ ] │
 └──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+- **Hàng trên cùng**: **Xoá hội thoại** (xoá lịch sử trên màn hình và trí nhớ của AI) kèm số lượt; bên phải là **thu gọn
+  khung tin nhắn** (chỉ giữ hàng trên cùng và ô nhập – gửi tin mới thì tự mở lại) và **thu nhỏ khung chat** thành nút
+  “Chat AI”. Chưa có tin nào thì hàng trên chỉ hiện “✦ Trợ lý AI”.
+- **Khung tin nhắn** giữ toàn bộ các lượt hỏi – đáp (tối đa 80 tin trên màn hình), tự cuộn tới tin mới, hiện “đang làm…”
+  ngay trong khung. Mỗi lần AI sửa tài liệu / trang có nút **↶ Hoàn tác** riêng; chỉ lần gần nhất còn hoàn tác được.
+  Bấm **Dừng** thì tin vừa gửi được bỏ khỏi khung (nội dung vẫn ở ô nhập); gửi lỗi thì tin được đánh dấu chưa gửi.
+- **Hàng công cụ** ngay trên ô nhập: mô hình, Copy context, nút cài đặt AI (chấm xanh = đã có key, cam = chưa).
+
 ### Cài đặt
 
-Bấm chip **API key** (hoặc chọn “⚙ Đổi nhà cung cấp…” trong dropdown mô hình):
+Mở tab **⚙ Cài đặt → Trợ lý AI** (nút ⚙ ở góc khung chat, hoặc “⚙ Cài đặt AI…” trong dropdown mô hình):
 
 1. Chọn nhà cung cấp (bảng dưới; có link “Lấy API key ↗” / “Tải … ↗”).
 2. Dán API key – luôn hiển thị dạng che bớt, ví dụ `AIza••••••WXYZ`; key đã lưu có nút Đổi / Xoá. Nhà cung cấp
    chạy trên máy / tuỳ chỉnh thì key không bắt buộc, thay vào đó nhập **địa chỉ máy chủ**.
 3. Chọn mô hình – danh sách **tải trực tiếp từ tài khoản / máy chủ** (đúng quyền của tài khoản), có gợi ý
    dự phòng và “Khác…” để tự nhập tên.
-4. **Áp dụng**.
+4. **Lưu cài đặt AI**.
 
 | Nhóm | Nhà cung cấp | Ghi chú |
 | --- | --- | --- |
@@ -306,11 +391,12 @@ gọi tới `http://localhost`, nên dùng Chrome / Edge / Firefox.
 > 🔒 Key chỉ lưu trong `localStorage` của trình duyệt này (riêng cho từng nhà cung cấp) và chỉ được gửi thẳng
 > tới nhà cung cấp đã chọn – không qua máy chủ trung gian. Không nên lưu key trên máy dùng chung.
 
-### Chọn nhanh trên khung chat
+### Mô hình, effort, thinking
 
-- **Mô hình**: đổi nhanh trong danh sách đã tải từ tài khoản.
-- **Effort**: mặc định · thấp · trung bình · cao · rất cao · tối đa – cao hơn thì kỹ hơn nhưng chậm và tốn token hơn.
-- **Thinking**: bật / tắt suy luận trước khi trả lời. Mô hình không tắt được thì nút hiện “Thinking: luôn bật”.
+- **Mô hình**: đổi nhanh bằng dropdown trên khung chat (danh sách đã tải từ tài khoản).
+- **Effort** (tab Cài đặt → Trợ lý AI → Cách AI trả lời): mặc định · thấp · trung bình · cao · rất cao · tối đa – cao hơn
+  thì kỹ hơn nhưng chậm và tốn token hơn.
+- **Thinking** (cùng chỗ): công tắc bật / tắt suy luận trước khi trả lời. Mô hình không tắt được thì công tắc bị khoá ở “bật”.
 
 Mỗi nhà cung cấp nhận tham số khác nhau; app chuyển đổi như sau:
 
@@ -341,7 +427,7 @@ và **ghi chú rõ** trong khung chat cấu hình nào đã thực sự được
   prompt (Claude: `cache_control`; OpenAI / Gemini tự cache phần đầu giống nhau) để không bị tính phí lại đầy đủ.
 - Skill gồm cả 3 chế độ, nên đổi loại diagram giữa chừng vẫn giữ nguyên cuộc trò chuyện.
 - Lịch sử chỉ giữ lời người dùng + phần giải thích của AI (bỏ khối JSON); **diagram hiện tại gửi kèm lượt mới
-  nhất** nên AI luôn sửa đúng bản đang mở, kể cả khi bạn vừa chỉnh tay. Nút ↻ để bắt đầu cuộc trò chuyện mới.
+  nhất** nên AI luôn sửa đúng bản đang mở, kể cả khi bạn vừa chỉnh tay. Nút **Xoá hội thoại** để bắt đầu cuộc trò chuyện mới.
 
 ### Copy context (dùng với AI bên ngoài)
 
@@ -384,7 +470,7 @@ câu chữ trước khi gửi thì cứ gõ phím như bình thường.
 
 ### Bộ nhận dạng
 
-Chuột phải vào 🎤 (hoặc nút “🎙 Giọng nói…” trong Cài đặt AI) để chọn:
+Tab **⚙ Cài đặt → Giọng nói** (hoặc chuột phải vào 🎤) để chọn – đổi là lưu ngay:
 
 | Bộ nhận dạng | Tải về | Đặc điểm |
 | --- | --- | --- |
@@ -438,7 +524,7 @@ Thời gian & ngôn ngữ → Giọng nói → Thêm giọng → Tiếng Việt 
 | Thu gọn / mở panel | `Ctrl+B` (thư viện) / `Ctrl+Alt+B` (thuộc tính) |
 | Gửi prompt cho AI | `Ctrl+Enter` trong ô chat |
 | Nói với AI | `Ctrl+M` (nói xong tự gửi) · `Ctrl+Shift+M` rảnh tay · `Esc` huỷ khi đang nghe |
-| Chuyển tab Tài liệu / Diagram / Thiết kế trang / Hướng dẫn | `Alt+1` / `Alt+2` / `Alt+3` / `Alt+4` |
+| Chuyển tab Tài liệu / Diagram / Thiết kế trang / Hướng dẫn / Cài đặt | `Alt+1` … `Alt+5` |
 | Tab Tài liệu | `Ctrl+S` lưu · `Ctrl+Shift+S` lưu thành · `Ctrl+O` mở · `Ctrl+B` / `Ctrl+I` / `Ctrl+K` / `Ctrl+E` đậm / nghiêng / link / code |
 | Tab Thiết kế trang | Nhấn đúp / `Enter` / `F2` sửa chữ · `Esc` chọn khung chứa · `↑` `↓` thành phần trước / sau · `Alt+↑` / `Alt+↓` đổi thứ tự · `Ctrl+C` / `Ctrl+X` / `Ctrl+V` / `Ctrl+D` · `Delete` · `Ctrl+Z` / `Ctrl+Y` · `Ctrl+S` tải JSON · `Ctrl+O` mở |
 
@@ -535,11 +621,14 @@ js/skill.js            sinh skill prompt cho AI (từ thư viện hình)
 js/ai.js               cấu hình AI, tải danh sách mô hình, gọi chat (Gemini / OpenAI / Claude)
 js/voice.js            giọng nói: Web Speech / Moonshine offline, lệnh giọng nói, đọc phản hồi, rảnh tay
 js/export.js           xuất SVG / PNG, nhúng Markdown
-js/markdown.js         render Markdown → HTML (CommonMark + GFM, không thư viện ngoài) + làm sạch HTML
+js/markdown.js         render Markdown → HTML (CommonMark + GFM + công thức, Mermaid, chú thích, emoji, [TOC], front matter) + làm sạch HTML
+js/md-rich.js          vẽ Mermaid / KaTeX / tô màu code / emoji (tải thư viện từ CDN khi cần, có SRI), hộp thoại sửa có xem trước
+js/plantuml.js         dịch PlantUML → JSON diagram (sequence, use case, class, activity, state, component, ER) + tự dàn trang, chạy offline
 js/docs.js             tab Tài liệu: soạn / xem .md, mở / lưu file, nhúng & sửa diagram (phiên nhúng), áp dụng tài liệu từ AI
 js/guide.js            tab Hướng dẫn: nội dung hướng dẫn sử dụng (Markdown), mục lục, tìm kiếm, nút “Thử” ví dụ prompt
 js/page-kit.js         thiết kế trang – lõi: danh mục thành phần & thuộc tính, chuẩn hoá / lọc JSON, sinh HTML + CSS, file HTML xuất ra, skill AI
 js/page-editor.js      thiết kế trang – giao diện: khung iframe, kéo thả, sửa chữ trực tiếp, bảng thuộc tính, lớp, trang, xem thử
+js/settings.js         tab Cài đặt: giao diện sáng / tối, trợ lý AI (form + effort / thinking), giọng nói, ứng dụng & dữ liệu
 js/editor.js           tương tác canvas (chọn, kéo, resize, nối, phím tắt)
 js/ui.js               toolbar, thư viện, bảng thuộc tính, tab JSON, trợ giúp, khung chat AI
 js/main.js             khởi động, tự lưu, PWA

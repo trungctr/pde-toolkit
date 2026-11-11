@@ -30,13 +30,13 @@
     grid: 'M4 4h16v16H4zM4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16',
     magnet: 'M6 4h4v7a2 2 0 004 0V4h4v7a6 6 0 01-12 0zM6 8h4M14 8h4',
     help: 'M12 21a9 9 0 100-18 9 9 0 000 18zM9.5 9a2.5 2.5 0 015 .5c0 1.5-2.5 2-2.5 3.5M12 17h.01',
-    moon: 'M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z',
-    sun: 'M12 8a4 4 0 100 8 4 4 0 000-8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
   };
 
   // ================================================================== THEME
   const THEME_KEY = 'diagram-editor:theme';
   const currentTheme = () => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+  const themeListeners = [];
+  const systemDark = () => !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
   UI.setTheme = function (t, persist = true) {
     document.documentElement.dataset.theme = t;
     if (persist) {
@@ -46,14 +46,31 @@
         /* ignore */
       }
     }
-    const btn = document.getElementById('theme-btn');
-    if (btn) {
-      btn.innerHTML = icon(t === 'dark' ? 'sun' : 'moon');
-      btn.title = t === 'dark' ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối (whiteboard chỉ dịu bớt, không đen)';
-    }
     const meta = document.querySelector('meta[name="theme-color"]:not([media])');
     if (meta) meta.content = t === 'dark' ? '#161b22' : '#ffffff';
+    themeListeners.forEach((f) => f(t));
   };
+  /** Lựa chọn của người dùng: 'light' | 'dark' | 'system' (chưa tự chọn = theo hệ điều hành) */
+  UI.themePref = function () {
+    let t = null;
+    try {
+      t = localStorage.getItem(THEME_KEY);
+    } catch (_) {
+      /* ignore */
+    }
+    return t === 'dark' || t === 'light' ? t : 'system';
+  };
+  UI.setThemePref = function (p) {
+    if (p === 'system') {
+      try {
+        localStorage.removeItem(THEME_KEY);
+      } catch (_) {
+        /* ignore */
+      }
+      UI.setTheme(systemDark() ? 'dark' : 'light', false);
+    } else UI.setTheme(p === 'dark' ? 'dark' : 'light');
+  };
+  UI.onTheme = (f) => themeListeners.push(f);
   // ================================================================= PANELS
   const PANEL_KEY = 'diagram-editor:panels';
   const PANELS = {
@@ -119,20 +136,21 @@
   // ================================================================ CHAT AI
   // Hiện mới có giao diện. Phần kết nối AI sẽ gắn vào các hàm CHAT_ACTIONS bên dưới.
   const CHAT_KEY = 'diagram-editor:chat-min';
+  /** Mở tab Cài đặt ở một nhóm ('ai' | 'voice' | 'look' | 'app'); chưa có tab thì dùng hộp thoại cũ */
+  const openSettings = (sec) => {
+    if (DE.settings) return DE.settings.open(sec);
+    if (sec === 'voice') return DE.voice && DE.voice.settingsDialog();
+    apiKeyDialog();
+  };
+  UI.openSettings = openSettings;
   const CHAT_ACTIONS = {
-    apikey: () => apiKeyDialog(),
+    settings: () => openSettings('ai'),
     context: () => skillDialog(),
     mic: () => DE.voice && DE.voice.toggle(),
     handsfree: () => DE.voice && DE.voice.toggleHandsFree(),
     send: (text) => chatSend(text),
     reset: () => chatReset(true),
-    closereply: () => showReply(null),
-    think: () => {
-      const c = DE.ai.load();
-      c.thinking = !c.thinking;
-      DE.ai.save(c);
-      renderQuickControls();
-    },
+    fold: () => setFold(!chatFolded),
   };
 
   // ------------------------------------------------------- hội thoại với AI
@@ -140,56 +158,130 @@
   // nhà cung cấp cache lại phần này). Lịch sử chỉ giữ lời người dùng + phần giải thích của AI
   // (bỏ khối JSON); diagram hiện tại được gửi kèm lượt mới nhất để AI luôn sửa đúng bản đang mở.
   const HISTORY_MAX = 8; // số tin nhắn cũ giữ lại
-  const chat = { system: null, history: [], busy: null };
+  const chat = { system: null, history: [], busy: null, gen: 0 };
   const FUN = [
     'Vibing…', 'Hooking…', 'Đang phác thảo…', 'Nối mũi tên…', 'Căn hàng các hình…', 'Pha cà phê cho AI…',
     'Đếm gateway…', 'Vẽ hình thoi…', 'Xếp swimlane…', 'Thì thầm với model…', 'Lắp ghép JSON…',
     'Mài bút chì…', 'Soi ký hiệu chuẩn…', 'Gỡ rối đường nối…', 'Brainstorming…', 'Cooking…',
   ];
 
+  // ------------------------------------------------- khung tin nhắn (lịch sử hỏi – đáp)
+  const LOG_MAX = 80; // số tin giữ trên màn hình
+  const FOLD_KEY = 'diagram-editor:chat-fold';
+  let chatFolded = false;
+  let lastUndo = {}; // loại ('doc' | 'page') -> nút hoàn tác của lần áp dụng gần nhất
+
+  /** Đồng bộ hàng trên cùng và khung tin nhắn theo nội dung hiện có */
   function updateTurns() {
     const turns = chat.history.filter((m) => m.role === 'user').length;
-    const el = $('#ai-turns'), rs = $('#ai-reset');
-    el.hidden = rs.hidden = !turns;
-    el.textContent = `Lượt ${turns}`;
-    el.title = `Cuộc trò chuyện đang có ${turns} lượt – AI nhớ các lượt này. Skill chỉ đặt một lần ở system instruction.`;
+    const has = !!$('#ai-log-list').children.length;
+    const el = $('#ai-turns');
+    el.hidden = !turns;
+    el.textContent = `${turns} lượt`;
+    el.title = `Cuộc trò chuyện đang có ${turns} lượt – AI nhớ các lượt này.`;
+    $('#ai-reset').hidden = !has;
+    $('#ai-title-empty').hidden = has;
+    $('#ai-fold').hidden = !has;
+    $('#ai-log').hidden = !has || chatFolded;
+  }
+  const scrollLog = () => {
+    const l = $('#ai-log');
+    l.scrollTop = l.scrollHeight;
+  };
+
+  /** Thu gọn / mở khung tin nhắn (vẫn giữ hàng trên cùng và ô nhập) */
+  function setFold(on, persist = true) {
+    chatFolded = !!on;
+    const b = $('#ai-fold');
+    const t = chatFolded ? 'Mở rộng khung tin nhắn' : 'Thu gọn khung tin nhắn';
+    b.setAttribute('aria-expanded', String(!chatFolded));
+    b.title = t;
+    b.setAttribute('aria-label', t);
+    b.querySelector('path').setAttribute('d', chatFolded ? 'M7 15l5 5 5-5M7 9l5-5 5 5' : 'M7 20l5-5 5 5M7 4l5 5 5-5');
+    if (persist) {
+      try {
+        localStorage.setItem(FOLD_KEY, chatFolded ? '1' : '0');
+      } catch (_) {
+        /* ignore */
+      }
+    }
+    updateTurns();
+    if (!chatFolded) scrollLog();
   }
 
+  /** Thêm một tin vào khung tin nhắn. role: 'user' | 'ai' | 'note'. Trả về phần tử tin */
+  function addMsg(role, text, { kind = '', title = '', actions = [] } = {}) {
+    const list = $('#ai-log-list');
+    const m = document.createElement('div');
+    m.className = `ai-msg ${role}` + (kind ? ' ' + kind : '');
+    if (role === 'ai' && title && title !== 'AI') {
+      const h = document.createElement('div');
+      h.className = 'ai-msg-head';
+      h.textContent = title;
+      m.appendChild(h);
+    }
+    const body = document.createElement('div');
+    body.className = 'ai-msg-body';
+    body.textContent = text;
+    m.appendChild(body);
+    if (actions.length) {
+      const acts = document.createElement('div');
+      acts.className = 'ai-msg-actions';
+      actions.forEach((a) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn';
+        btn.textContent = a.label;
+        btn.addEventListener('click', () => a.fn(btn));
+        acts.appendChild(btn);
+        if (a.undoKind) {
+          // chỉ hoàn tác được lần áp dụng gần nhất: khoá nút của lần trước cùng loại
+          const prev = lastUndo[a.undoKind];
+          if (prev && !prev.disabled) {
+            prev.disabled = true;
+            prev.title = 'Chỉ hoàn tác được thay đổi gần nhất của AI';
+          }
+          lastUndo[a.undoKind] = btn;
+        }
+      });
+      m.appendChild(acts);
+    }
+    list.appendChild(m);
+    while (list.children.length > LOG_MAX) list.firstElementChild.remove();
+    updateTurns();
+    scrollLog();
+    return m;
+  }
+  /** Lời đáp / thông báo của AI trong khung tin nhắn. kind: 'ok' | 'err' | '' */
+  function showReply(text, kind = '', title = 'AI', actions = []) {
+    if (text == null) return null;
+    return addMsg('ai', text, { kind, title, actions });
+  }
+  const addNote = (text) => addMsg('note', text);
+  /** Nút "↶ Hoàn tác thay đổi của AI" gắn vào lời đáp */
+  const undoAction = (kind, undo, doneMsg) => ({
+    label: '↶ Hoàn tác thay đổi của AI',
+    undoKind: kind,
+    fn: (btn) => {
+      if (!undo()) return;
+      btn.disabled = true;
+      btn.textContent = '✓ Đã hoàn tác';
+      if (lastUndo[kind] === btn) delete lastUndo[kind];
+      addNote(doneMsg);
+      UI.toast('Đã hoàn tác thay đổi của AI', 'ok');
+    },
+  });
+
+  /** Xoá hội thoại: xoá lịch sử trên màn hình và trí nhớ của AI */
   function chatReset(announce) {
+    chat.gen++;
     if (chat.busy) chat.busy.ctrl.abort();
     chat.system = null;
     chat.history = [];
+    $('#ai-log-list').innerHTML = '';
+    lastUndo = {};
     updateTurns();
-    if (announce) {
-      showReply(null);
-      UI.toast('Đã bắt đầu cuộc trò chuyện mới – AI không còn nhớ các lượt trước', 'info');
-    }
-  }
-
-  /** Hiện lời đáp / thông báo trong khung chat. kind: 'ok' | 'err' | '' ; text = null để ẩn */
-  function showReply(text, kind = '', title = 'AI', actions = []) {
-    const box = $('#ai-reply');
-    const acts = $('#ai-reply-actions');
-    if (text == null) {
-      box.hidden = true;
-      return;
-    }
-    box.hidden = false;
-    box.className = 'ai-reply' + (kind ? ' ' + kind : '');
-    $('#ai-reply-title').textContent = title;
-    $('#ai-reply-body').textContent = text;
-    if (acts) {
-      acts.innerHTML = '';
-      acts.hidden = !actions.length;
-      actions.forEach((a) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'btn';
-        b.textContent = a.label;
-        b.addEventListener('click', a.fn);
-        acts.appendChild(b);
-      });
-    }
+    if (announce) UI.toast('Đã xoá hội thoại – AI không còn nhớ các lượt trước', 'info');
   }
 
   function setBusy(on) {
@@ -200,6 +292,7 @@
       txt.textContent = FUN[i];
       time.textContent = '0s';
       busyEl.hidden = false;
+      scrollLog();
       const tick = setInterval(() => {
         const sec = Math.floor((Date.now() - started) / 1000);
         time.textContent = sec < 60 ? `${sec}s` : `${Math.floor(sec / 60)}m${String(sec % 60).padStart(2, '0')}s`;
@@ -266,7 +359,9 @@
     else ctx = DE.docs.contextForAI();
     const userMsg = text + '\n\n---\n' + ctx;
     const messages = [...chat.history.slice(-HISTORY_MAX), { role: 'user', content: userMsg }];
-    showReply(null);
+    const gen = chat.gen;
+    if (chatFolded) setFold(false, false); // gửi tin mới: mở khung tin nhắn để thấy câu trả lời
+    const userEl = addMsg('user', text);
     setBusy(true);
     const signal = chat.busy.ctrl.signal;
     let res;
@@ -275,10 +370,14 @@
     } catch (e) {
       setBusy(false);
       if (e.name === 'AbortError') {
-        showReply('Đã dừng yêu cầu. Nội dung bạn viết vẫn còn trong ô chat.', '', 'Đã dừng');
+        if (gen !== chat.gen) return { status: 'aborted' }; // dừng vì xoá hội thoại
+        userEl.remove();
+        addNote('Đã dừng yêu cầu – nội dung bạn viết vẫn còn trong ô chat.');
         return { status: 'aborted' };
       }
       const msg = e instanceof TypeError ? 'Không kết nối được tới nhà cung cấp (kiểm tra mạng).' : e.message;
+      userEl.classList.add('failed');
+      userEl.title = 'Chưa gửi được – nội dung vẫn còn trong ô chat';
       showReply(msg, 'err', 'Lỗi');
       UI.toast('Gửi không thành công: ' + msg, 'error');
       return { status: 'error', message: msg };
@@ -305,17 +404,7 @@
             notes,
           'ok',
           `Xong · ${r.pages} trang, ${r.count} thành phần`,
-          [
-            {
-              label: '↶ Hoàn tác thay đổi của AI',
-              fn: () => {
-                if (DE.pages.undoAI()) {
-                  showReply('Đã khôi phục dự án như trước khi AI sửa.', '', 'Đã hoàn tác');
-                  UI.toast('Đã hoàn tác thay đổi của AI', 'ok');
-                }
-              },
-            },
-          ]
+          [undoAction('page', () => DE.pages.undoAI(), 'Đã khôi phục dự án như trước khi AI sửa.')]
         );
         UI.toast('✓ Đã áp dụng trang từ AI – không ưng thì bấm “Hoàn tác” trong khung chat hoặc Ctrl+Z', 'ok');
         return { status: 'applied', text: explain };
@@ -340,17 +429,7 @@
           notes,
         r.errors.length ? '' : 'ok',
         'Xong · tài liệu',
-        [
-          {
-            label: '↶ Hoàn tác thay đổi của AI',
-            fn: () => {
-              if (DE.docs.undoAI()) {
-                showReply('Đã khôi phục tài liệu như trước khi AI sửa.', '', 'Đã hoàn tác');
-                UI.toast('Đã hoàn tác thay đổi của AI', 'ok');
-              }
-            },
-          },
-        ]
+        [undoAction('doc', () => DE.docs.undoAI(), 'Đã khôi phục tài liệu như trước khi AI sửa.')]
       );
       UI.toast('✓ Đã cập nhật tài liệu từ AI – không ưng thì bấm “Hoàn tác” trong khung chat', 'ok');
       return { status: 'applied', text: explainMd };
@@ -541,22 +620,29 @@
   }
 
   // ------------------------------------------------------ cài đặt API key
-  /** Cập nhật chip "API key" trên khung chat theo cấu hình đang dùng */
+  const aiListeners = [];
+  /** Báo khi cấu hình AI đổi (tab Cài đặt vẽ lại phần trạng thái / effort / thinking) */
+  UI.onAiChange = (f) => aiListeners.push(f);
+  /** Cập nhật nút cài đặt AI (chấm xanh / cam) và dropdown mô hình trên khung chat */
   function updateApiChip() {
-    const chip = $('[data-chat="apikey"]');
-    if (!chip) return;
-    const a = DE.ai.active();
-    chip.querySelector('span').textContent = a ? DE.ai.PROVIDERS[a.provider].short : 'API key';
-    const dot = chip.querySelector('.ai-dot');
-    dot.classList.toggle('ok', !!a);
-    dot.title = a ? `Đang dùng ${a.providerName} – ${a.model}` : 'Chưa có API key';
-    chip.title = a ? `${a.providerName} · ${a.model}${a.key ? ` · key ${DE.ai.mask(a.key)}` : ''} – bấm để đổi` : 'Chọn nhà cung cấp AI (có loại miễn phí) và thêm API key';
+    const btn = $('[data-chat="settings"]');
+    if (btn) {
+      const a = DE.ai.active();
+      const dot = btn.querySelector('.ai-dot');
+      dot.classList.toggle('ok', !!a);
+      dot.title = a ? `Đang dùng ${a.providerName} – ${a.model}` : 'Chưa có API key';
+      btn.title = a
+        ? `Cài đặt AI – đang dùng ${a.providerName} · ${a.model}${a.key ? ` · key ${DE.ai.mask(a.key)}` : ''}`
+        : 'Cài đặt AI: chọn nhà cung cấp (có loại miễn phí) và thêm API key';
+    }
     renderQuickControls();
+    aiListeners.forEach((f) => f());
   }
+  UI.refreshAI = updateApiChip;
 
-  /** Dropdown mô hình, effort và nút thinking trên khung chat */
+  /** Dropdown mô hình trên khung chat (effort / thinking nằm ở tab Cài đặt) */
   function renderQuickControls() {
-    const sel = $('#ai-model-quick'), eff = $('#ai-effort'), think = $('#ai-think');
+    const sel = $('#ai-model-quick');
     if (!sel) return;
     const c = DE.ai.load(), p = c.provider, P = DE.ai.PROVIDERS[p], cur = c.models[p];
     if (!DE.ai.isConfigured(p, c)) {
@@ -567,23 +653,11 @@
       const list = c.lists[p] && c.lists[p].length ? c.lists[p] : P.suggested.map((id) => ({ id, label: id }));
       let html = `<optgroup label="${esc(P.name)}">` + list.map((m) => `<option value="${esc(m.id)}">${m.free ? '🆓 ' : ''}${esc(m.id)}</option>`).join('') + '</optgroup>';
       if (cur && !list.some((m) => m.id === cur)) html = `<option value="${esc(cur)}">${esc(cur)}</option>` + html;
-      html += '<option value="__settings">⚙ Đổi nhà cung cấp / tải lại danh sách…</option>';
+      html += '<option value="__settings">⚙ Cài đặt AI (nhà cung cấp, effort, thinking)…</option>';
       sel.innerHTML = html;
       sel.value = cur || '';
       sel.title = `Mô hình (${P.name}): ${cur || 'chưa chọn'}`;
     }
-    eff.value = c.effort || '';
-    const caps = DE.ai.thinkingCaps(p, cur);
-    const on = c.thinking || !caps.canDisable;
-    think.setAttribute('aria-pressed', String(on));
-    think.classList.toggle('on', on);
-    think.disabled = !caps.canDisable;
-    think.querySelector('span').textContent = !caps.canDisable ? 'Thinking: luôn bật' : on ? 'Thinking: bật' : 'Thinking: tắt';
-    think.title = !caps.canDisable
-      ? caps.note
-      : on
-        ? 'Thinking đang bật: mô hình suy luận trước khi trả lời (kỹ hơn, chậm hơn). Bấm để tắt.'
-        : 'Thinking đang tắt: trả lời nhanh, ít token hơn. Bấm để bật.';
   }
 
   function initQuickControls() {
@@ -591,7 +665,7 @@
       const v = e.target.value;
       if (v === '__settings' || !v) {
         renderQuickControls(); // trả dropdown về mô hình đang dùng
-        if (v === '__settings') apiKeyDialog();
+        if (v === '__settings') openSettings('ai');
         return;
       }
       const c = DE.ai.load();
@@ -600,25 +674,28 @@
       updateApiChip();
       e.target.blur();
     });
-    $('#ai-effort').addEventListener('change', (e) => {
-      const c = DE.ai.load();
-      c.effort = e.target.value;
-      DE.ai.save(c);
-      e.target.blur();
-    });
   }
 
+  /** Hộp thoại cài đặt AI (dùng khi gửi chat mà chưa có key – cài xong gửi tiếp ngay tại chỗ) */
   function apiKeyDialog() {
+    return mountAiForm(null);
+  }
+  /** Form cài đặt AI nằm ngay trong tab Cài đặt. Trả về { dispose } */
+  UI.aiForm = (host) => mountAiForm(host);
+
+  function mountAiForm(host) {
+    const inline = !!host;
     const cfg = DE.ai.load();
     const P = DE.ai.PROVIDERS;
     const modelCache = {}; // provider -> [{id,label}] đã tải từ API
     let editingKey = false; // đang nhập key mới thay cho key đã lưu
     let loadSeq = 0;
     const back = document.createElement('div');
-    back.className = 'modal-backdrop';
+    back.className = inline ? 'ai-inline' : 'modal-backdrop';
     back.innerHTML =
-      `<div class="modal ai-modal" role="dialog" aria-modal="true" aria-labelledby="ai-title">` +
-      `<h3 id="ai-title">Cài đặt AI</h3>` +
+      (inline
+        ? `<div class="ai-form">`
+        : `<div class="modal ai-modal" role="dialog" aria-modal="true" aria-labelledby="ai-title"><h3 id="ai-title">Cài đặt AI</h3>`) +
       `<label class="f"><span>Nhà cung cấp</span><select id="ai-provider">` +
       DE.ai.GROUPS.map(([g, gl]) => {
         const items = Object.entries(P).filter(([, p]) => p.group === g);
@@ -634,8 +711,9 @@
       `<input type="text" id="ai-model-custom" class="ai-model-custom" placeholder="Nhập tên mô hình, vd: claude-opus-5-5" hidden autocomplete="off" spellcheck="false">` +
       `<div id="ai-model-status" class="msg"></div></div>` +
       `<p class="hint ai-privacy">🔒 API key chỉ lưu trong trình duyệt này và chỉ được gửi trực tiếp tới nhà cung cấp đã chọn. Không nên lưu key trên máy dùng chung.</p>` +
-      `<div class="modal-actions"><button class="btn ai-voice-link" data-r="voice" title="Nhận dạng giọng nói, lệnh giọng nói, giọng đọc phản hồi">🎙 Giọng nói…</button>` +
-      `<button class="btn" data-r="cancel">Huỷ</button><button class="btn primary" data-r="apply">Áp dụng</button></div></div>`;
+      (inline
+        ? `<div class="set-actions"><span class="msg" id="ai-dirty"></span><button class="btn" data-r="revert" hidden>Bỏ thay đổi</button><button class="btn primary" data-r="apply">Lưu cài đặt AI</button></div></div>`
+        : `<div class="modal-actions"><button class="btn" data-r="cancel">Huỷ</button><button class="btn primary" data-r="apply">Áp dụng</button></div></div>`);
     const $$b = (q) => back.querySelector(q);
     const provSel = $$b('#ai-provider'), keyBox = $$b('#ai-keybox'), modelSel = $$b('#ai-model');
     const customIn = $$b('#ai-model-custom'), status = $$b('#ai-model-status');
@@ -750,19 +828,36 @@
       }
     }
 
-    const close = () => {
-      window.removeEventListener('keydown', onKey, true);
+    let disposed = false;
+    const dispose = () => {
+      if (disposed) return;
+      disposed = true;
+      ++loadSeq; // bỏ kết quả tải danh sách mô hình đang chờ
+      if (!inline) window.removeEventListener('keydown', onKey, true);
       back.remove();
     };
+    const inst = { dispose };
+    // trong tab Cài đặt: vẽ lại form ngay tại chỗ (sau khi lưu / bỏ thay đổi)
+    const rerender = () => {
+      dispose();
+      inst.dispose = mountAiForm(host).dispose;
+    };
+    const close = () => (inline ? rerender() : dispose());
     const onKey = (e) => {
-      e.stopPropagation(); // chặn phím tắt của editor khi đang mở form
-      if (e.key === 'Escape') {
+      if (!inline) e.stopPropagation(); // chặn phím tắt của editor khi đang mở form
+      if (e.key === 'Escape' && !inline) {
         e.preventDefault();
         close();
       } else if (e.key === 'Enter' && back.contains(e.target) && e.target.matches('input')) {
         e.preventDefault();
         apply();
       }
+    };
+    // trong tab Cài đặt: báo "chưa lưu" khi người dùng sửa form
+    const markDirty = (e) => {
+      if (!inline) return;
+      $$b('#ai-dirty').textContent = '● Có thay đổi chưa lưu';
+      $$b('[data-r="revert"]').hidden = false;
     };
     function apply() {
       const p = prov();
@@ -811,16 +906,15 @@
       customIn.hidden = modelSel.value !== '__custom';
       if (!customIn.hidden) customIn.focus();
     });
+    back.addEventListener('input', markDirty);
+    back.addEventListener('change', markDirty);
     back.addEventListener('click', (e) => {
       const b = e.target.closest('[data-r]');
-      if ((b && b.dataset.r === 'cancel') || e.target === back) return close();
+      if ((b && b.dataset.r === 'cancel') || (!inline && e.target === back)) return close();
       if (!b) return;
       const r = b.dataset.r;
       if (r === 'apply') apply();
-      else if (r === 'voice') {
-        close();
-        DE.voice && DE.voice.settingsDialog();
-      }
+      else if (r === 'revert') rerender();
       else if (r === 'refresh') {
         Object.keys(modelCache).forEach((k) => k.startsWith(prov()) && delete modelCache[k]);
         loadModels();
@@ -844,13 +938,19 @@
         UI.toast(`Đã xoá API key của ${P[prov()].name}`, 'info');
       }
     });
-    window.addEventListener('keydown', onKey, true);
-    document.body.appendChild(back);
+    if (inline) {
+      back.addEventListener('keydown', onKey);
+      host.appendChild(back);
+    } else {
+      window.addEventListener('keydown', onKey, true);
+      document.body.appendChild(back);
+    }
     provSel.value = cfg.provider;
     renderProvider();
     renderKeyBox();
     loadModels();
-    ($$b('#ai-key-input') || provSel).focus();
+    if (!inline) ($$b('#ai-key-input') || provSel).focus();
+    return inst;
   }
 
   function initChat() {
@@ -902,6 +1002,13 @@
       /* mặc định: hiện khung chat */
     }
     setMin(min);
+    let folded = false;
+    try {
+      folded = localStorage.getItem(FOLD_KEY) === '1';
+    } catch (_) {
+      /* mặc định: mở */
+    }
+    setFold(folded, false);
     autosize();
     initQuickControls();
     updateApiChip();
@@ -928,6 +1035,7 @@
         E.invalidate(false);
       },
       theme: (t) => UI.setTheme(t),
+      openSettings: (sec) => openSettings(sec),
       help: () => {
         // "hướng dẫn" / "trợ giúp": mở tab Hướng dẫn sử dụng
         if (DE.docs) return DE.docs.show('guide');
@@ -1359,7 +1467,20 @@
         console.warn('[Diagram Editor] File không hợp lệ:', file.name, errors);
       };
       if (/\.(md|markdown|mdx)$/i.test(file.name) && DE.docs) return DE.docs.openFile(file);
-      if (!/\.json$/i.test(file.name)) return fail('chỉ nhận file .json của Diagram Editor (file .md mở ở tab Tài liệu).', []);
+      // PlantUML: dịch sang diagram của app ngay trong trình duyệt (không gửi lên máy chủ)
+      if (/\.(puml|plantuml|pu|iuml|wsd)$/i.test(file.name) && DE.plantuml) {
+        const r = DE.plantuml.convert(await file.text());
+        if (!r.ok) return fail('không đọc được sơ đồ PlantUML.', [r.error]);
+        if (!r.doc.meta.name || r.doc.meta.name === DE.plantuml.KIND_NAME[r.kind]) r.doc.meta.name = file.name.replace(/\.\w+$/, '');
+        store.load(r.doc);
+        setMode('uml', { silent: true });
+        E.setSelection([]);
+        E.fit();
+        UI.toast(`Đã chuyển "${file.name}" (PlantUML · ${DE.plantuml.KIND_NAME[r.kind]}) thành diagram` + (r.warnings.length ? ` – bỏ qua ${r.warnings.length} chi tiết chưa hỗ trợ` : '') + '. Ctrl+Z để hoàn tác.', r.warnings.length ? 'warn' : 'ok');
+        if (r.warnings.length) console.info('[Diagram Editor] PlantUML – chi tiết bỏ qua:\n' + r.warnings.join('\n'));
+        return;
+      }
+      if (!/\.json$/i.test(file.name)) return fail('chỉ nhận file .json của Diagram Editor hoặc file PlantUML .puml (file .md mở ở tab Tài liệu).', []);
       let raw;
       try {
         raw = JSON.parse(await file.text());
@@ -2028,9 +2149,20 @@
   /** Áp dụng nội dung tab JSON. Trả về { ok, doc, removed, fixed, cancelled, error } */
   async function applyJson() {
     if (applying) return { ok: false, error: 'Đang có một thao tác áp dụng khác' };
-    let raw, res;
+    let raw, res, puml = null;
     try {
-      raw = parseLooseJSON($('#json-text').value);
+      const txt = $('#json-text').value;
+      // dán mã PlantUML (@startuml …) vào ô JSON: dịch sang diagram của app
+      if (DE.plantuml && DE.plantuml.looksLike(txt) && !/^\s*[{[]/.test(txt)) {
+        puml = DE.plantuml.convert(txt);
+        if (!puml.ok) {
+          showJsonMsg('PlantUML: ' + puml.error, 'err');
+          return { ok: false, error: puml.error };
+        }
+        raw = puml.doc;
+        $('#json-text').value = JSON.stringify(puml.doc, null, 2);
+        UI.toast(`Đã dịch PlantUML (${DE.plantuml.KIND_NAME[puml.kind]}) sang diagram` + (puml.warnings.length ? ` – bỏ qua ${puml.warnings.length} chi tiết chưa hỗ trợ` : ''), puml.warnings.length ? 'warn' : 'ok');
+      } else raw = parseLooseJSON(txt);
     } catch (e) {
       showJsonMsg('JSON sai cú pháp – chưa áp dụng gì.\n' + e.message, 'err');
       return { ok: false, error: 'JSON sai cú pháp: ' + e.message };

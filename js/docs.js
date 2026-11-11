@@ -254,6 +254,173 @@
     anchorsDirty = true;
     linesDirty = true;
     updateStatus();
+    // Mermaid, công thức, tô màu code, emoji: tải thư viện khi cần rồi vẽ (không chặn việc soạn)
+    if (DE.mdRich) {
+      const g = ++richGen;
+      DE.mdRich.enhance(pv, { editor: true, isCurrent: () => g === richGen }).then(() => {
+        if (g === richGen) anchorsDirty = true;
+      });
+    }
+  }
+  let richGen = 0;
+
+  // ------------------------------------------------ sửa Mermaid / công thức / khối mã gốc
+  const inCode = () => view === 'code' || (view === 'split' && lastFocus === 'ta');
+  /** Ghi lại tài liệu sau khi sửa trực tiếp DOM của khung soạn (data-raw / data-tex) rồi vẽ lại */
+  function commitVisualDom() {
+    visualDirty = true;
+    flushVisual();
+    renderPreview();
+  }
+  async function editRich(el) {
+    const R = DE.mdRich;
+    if (!R) return;
+    flushVisual();
+    // công thức trong dòng
+    if (el.classList.contains('md-math') && !el.closest('.md-math-block')) {
+      const r = await R.editDialog({ kind: 'math', title: 'Sửa công thức', value: el.getAttribute('data-tex') || '', display: !!el.getAttribute('data-display') });
+      if (!r) return;
+      if (!r.value.trim()) el.remove();
+      else el.setAttribute('data-tex', r.value.trim());
+      return commitVisualDom();
+    }
+    const blk = el.closest('.md-raw');
+    if (!blk || !pv.contains(blk)) return;
+    const raw = blk.getAttribute('data-raw') || '';
+    const fence = (raw.match(/^\s*(`{3,}|~{3,})/) || [])[1];
+    let o = { kind: 'raw', title: 'Sửa mã HTML', value: raw }, wrap = (v) => v;
+    if (blk.classList.contains('md-toc')) return toast('Mục lục tự cập nhật theo các tiêu đề trong tài liệu', 'info');
+    if (blk.classList.contains('md-mermaid')) {
+      o = { kind: 'mermaid', title: 'Sửa sơ đồ Mermaid', value: blk.getAttribute('data-src') || '', templates: true };
+      wrap = (v) => `${fence || '```'}mermaid\n${v}\n${fence || '```'}`;
+    } else if (blk.classList.contains('md-plantuml')) {
+      const lang = (raw.match(/^\s*(?:`{3,}|~{3,})\s*([\w-]+)/) || [])[1] || 'plantuml';
+      o = { kind: 'plantuml', title: 'Sửa sơ đồ PlantUML', value: blk.getAttribute('data-src') || '' };
+      wrap = (v) => `${fence || '```'}${lang}\n${v}\n${fence || '```'}`;
+    } else if (blk.classList.contains('md-math-block')) {
+      o = { kind: 'math', title: 'Sửa công thức', value: (blk.querySelector('.md-math') || blk).getAttribute('data-tex') || '' };
+      wrap = (v) => (fence ? `${fence}math\n${v}\n${fence}` : `$$\n${v}\n$$`);
+    } else if (blk.classList.contains('md-frontmatter')) {
+      o = { kind: 'raw', title: 'Sửa thông tin đầu tài liệu (front matter)', value: raw.replace(/^---[ \t]*\n?/, '').replace(/\n?(---|\.\.\.)[ \t]*$/, ''), hint: 'Mỗi dòng một mục dạng  khoá: giá trị  (YAML). Ctrl+Enter để áp dụng.' };
+      wrap = (v) => `---\n${v}\n---`;
+    } else if (blk.classList.contains('md-footnotes')) {
+      o = { kind: 'raw', title: 'Sửa chú thích cuối trang', value: raw, hint: 'Mỗi chú thích một dòng:  [^1]: nội dung  – số trong ngoặc khớp với chỗ tham chiếu [^1] trong bài. Ctrl+Enter để áp dụng.' };
+    }
+    const r = await R.editDialog(o);
+    if (!r) return;
+    const v = r.value.replace(/\s+$/, '');
+    if (!v.trim()) blk.remove();
+    else blk.setAttribute('data-raw', wrap(v));
+    commitVisualDom();
+  }
+
+  /** Khối PlantUML -> diagram của app (sửa kéo thả trên whiteboard) */
+  async function plantumlToDiagram(blk) {
+    const r = DE.mdRich && DE.mdRich.plantumlDoc(blk.getAttribute('data-src'));
+    if (!r || !r.ok) return toast('Chưa đọc được sơ đồ PlantUML này' + (r ? ': ' + r.error : ''), 'warn');
+    const ok = await DE.ui.confirm({
+      title: 'Chuyển PlantUML thành diagram sửa được?',
+      message:
+        'Khối mã PlantUML được thay bằng một diagram vẽ trên whiteboard: kéo thả, đổi màu, nối thêm hình… như mọi diagram khác. ' +
+        'Mã PlantUML gốc sẽ không còn trong tài liệu (Ctrl+Z ở khung mã để hoàn tác).' +
+        (r.warnings.length ? `\n\nLưu ý: ${r.warnings.length} chi tiết PlantUML chưa hỗ trợ đã bị bỏ qua.` : ''),
+      ok: 'Chuyển và mở whiteboard',
+    });
+    if (!ok) return;
+    const doc = DE.clone(r.doc);
+    const id = newId();
+    state.diagrams[id] = doc;
+    blk.setAttribute('data-raw', placeholder(id, doc));
+    commitVisualDom();
+    startSession({ kind: 'edit', id, doc });
+  }
+
+  async function insertMermaid() {
+    const pos = caretPos();
+    const r = await DE.mdRich.editDialog({ kind: 'mermaid', title: 'Chèn sơ đồ Mermaid', value: '', templates: true, ok: 'Chèn vào tài liệu' });
+    if (!r || !r.value.trim()) return;
+    insertBlock('```mermaid\n' + r.value.trim() + '\n```', pos);
+    renderPreview();
+  }
+  /** Lưu vị trí con trỏ của khung trực quan trước khi mở hộp thoại (hộp thoại lấy mất focus) */
+  function keepCaret() {
+    if (inCode()) return null;
+    ensureVisualFocus();
+    return saveSel();
+  }
+  function backToCaret(range) {
+    if (!range) return;
+    restoreSel(range);
+    lastRange = range.cloneRange(); // selectionchange chạy trễ – cập nhật ngay cho caretPos()
+  }
+  /**
+   * Chèn một phần tử "nguyên khối" (công thức, chú thích) đúng tại con trỏ. Không dùng
+   * execCommand('insertHTML'): Chrome đẩy phần tử contenteditable=false ở cuối đoạn thành đoạn mới.
+   */
+  function insertAtom(html) {
+    ensureVisualFocus();
+    const s = getSelection();
+    if (!s.rangeCount || !inVisual(s.anchorNode)) return false;
+    const r = s.getRangeAt(0);
+    const host = r.startContainer.nodeType === 3 ? r.startContainer.parentElement : r.startContainer;
+    const lock = host && host.closest('[contenteditable="false"]');
+    if (lock && pv.contains(lock)) r.setStartAfter(lock);
+    r.deleteContents();
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    const node = tpl.content.firstElementChild;
+    const zw = document.createTextNode('​');
+    r.insertNode(zw);
+    r.insertNode(node);
+    const nr = document.createRange();
+    nr.setStartAfter(zw);
+    nr.collapse(true);
+    s.removeAllRanges();
+    s.addRange(nr);
+    return true;
+  }
+  async function insertMath() {
+    const code = inCode();
+    const range = keepCaret();
+    const s0 = ta.selectionStart, s1 = ta.selectionEnd;
+    const r = await DE.mdRich.editDialog({ kind: 'math', title: 'Chèn công thức', value: '', modes: true, ok: 'Chèn vào tài liệu' });
+    backToCaret(range);
+    if (!r || !r.value.trim()) return;
+    const tex = r.value.trim();
+    if (r.display) {
+      insertBlock('$$\n' + tex + '\n$$', code ? s0 : caretPos());
+      return renderPreview();
+    }
+    if (code) return replaceRange(s0, s1, '$' + tex + '$', s0 + tex.length + 2);
+    insertAtom(`<span class="md-math" contenteditable="false" data-tex="${esc(tex)}">${esc('$' + tex + '$')}</span>`);
+    commitVisualDom();
+  }
+  async function insertFootnote() {
+    const code = inCode();
+    flushVisual();
+    const range = keepCaret();
+    const s0 = ta.selectionStart, s1 = ta.selectionEnd;
+    const r = await formDialog({ title: 'Chèn chú thích cuối trang', fields: [{ name: 'text', label: 'Nội dung chú thích', placeholder: 'vd: Nguồn: Báo cáo thường niên 2025' }], ok: 'Chèn' });
+    backToCaret(range);
+    if (!r || !r.text || !r.text.trim()) return;
+    const nums = [...ta.value.matchAll(/\[\^(\d+)\]/g)].map((m) => +m[1]);
+    const n = nums.length ? Math.max(...nums) + 1 : 1;
+    if (code) replaceRange(s0, s1, `[^${n}]`);
+    else {
+      insertAtom(`<sup class="md-fn-ref" contenteditable="false" data-fn="${n}">${n}</sup>`);
+      visualDirty = true;
+      flushVisual();
+    }
+    const v = ta.value.replace(/\s+$/, '');
+    ta.setRangeText(`\n\n[^${n}]: ${r.text.trim().replace(/\s*\n\s*/g, ' ')}\n`, v.length, ta.value.length, 'preserve');
+    onInput();
+    renderPreview();
+    toast(`Đã thêm chú thích [${n}] – nội dung nằm ở khu “Chú thích” cuối tài liệu`, 'ok');
+  }
+  function insertToc() {
+    if (/^ {0,3}(?:\[toc\]|\[\[_?toc_?\]\]|\$\{toc\})[ \t]*$/im.test(ta.value)) return toast('Tài liệu đã có mục lục', 'info');
+    insertBlock('[TOC]', caretPos());
+    renderPreview();
   }
 
   // ======================================================= TRÌNH SOẠN TRỰC QUAN
@@ -593,8 +760,15 @@
     const text = dt.getData('text/plain');
     const a = anchorEl();
     if (a && a.closest('pre, code')) return exec('insertText', text);
-    // câu trả lời của AI bên ngoài (dùng skill tài liệu): có khối ````markdown và/hoặc ```diagram
-    if (/^ {0,3}(`{3,}|~{3,})[ \t]*(diagram|markdown|md)[ \t]*$/im.test(text)) {
+    // câu trả lời của AI bên ngoài (dùng skill tài liệu): có khối ````markdown / ```diagram / ```mermaid,
+    // công thức $$ hay chú thích [^1]: … -> đi qua Markdown để giữ đúng các khối đặc biệt
+    // mã PlantUML dán trần (@startuml … @enduml) -> bọc thành khối ```plantuml
+    if (/^\s*@start(uml|\w+)\b[\s\S]*^\s*@end\1\b/im.test(text) && !/^ {0,3}(`{3,}|~{3,})/m.test(text)) {
+      insertBlock('```plantuml\n' + text.trim() + '\n```', caretPos());
+      renderPreview();
+      return toast('Đã chèn sơ đồ PlantUML – nhấn đúp để sửa mã, hoặc “◆ Sửa trên whiteboard” để kéo thả', 'ok');
+    }
+    if (/^ {0,3}(`{3,}|~{3,})[ \t]*(diagram|markdown|md|mermaid|math|plantuml|puml|uml)[ \t]*$|^ {0,3}\$\$|^ {0,3}\[\^[^\]\s]+\]:/im.test(text)) {
       const r = importDiagramFences(DOCS.extractMarkdown(text) || text);
       const pos = caretPos();
       insertBlock(r.text.trim(), pos);
@@ -1068,13 +1242,21 @@
     }
   }
 
-  function exportHTML() {
+  async function exportHTML() {
     flushName();
     flushVisual();
     renderPreview();
     const clone = pv.cloneNode(true);
     clone.removeAttribute('contenteditable');
     clone.querySelectorAll('.dg-actions').forEach((n) => n.remove());
+    // vẽ Mermaid (ảnh SVG nhúng), công thức (MathML – không cần CSS / font ngoài), tô màu code, emoji
+    if (DE.mdRich && clone.querySelector('.md-mermaid, .md-plantuml, .md-math, .md-emoji, pre > code[class*="language-"]')) {
+      toast('Đang chuẩn bị file HTML (vẽ sơ đồ, công thức)…', 'info');
+      await DE.mdRich.enhance(clone, { mathml: true });
+    }
+    clone.querySelectorAll('[data-src],[data-tex],[data-sc],[data-fn],[data-type],[data-title],[data-fold]').forEach((n) => {
+      ['data-src', 'data-tex', 'data-sc', 'data-fn', 'data-type', 'data-title', 'data-fold'].forEach((a) => n.removeAttribute(a));
+    });
     clone.querySelectorAll('[contenteditable],[data-raw]').forEach((n) => {
       n.removeAttribute('contenteditable');
       n.removeAttribute('data-raw');
@@ -1278,10 +1460,11 @@
     diagram: 'Hỏi AI về diagram này…',
     design: 'Nhờ AI dựng / sửa trang web này…',
     guide: 'Hỏi AI cách sử dụng công cụ…',
+    settings: 'Hỏi AI…',
   };
 
-  const WS_ORDER = ['doc', 'diagram', 'design', 'guide'];
-  /** Chuyển tab: 'doc' (Tài liệu) | 'diagram' | 'design' (Thiết kế trang) | 'guide' (Hướng dẫn) */
+  const WS_ORDER = ['doc', 'diagram', 'design', 'guide', 'settings'];
+  /** Chuyển tab: 'doc' (Tài liệu) | 'diagram' | 'design' (Thiết kế trang) | 'guide' (Hướng dẫn) | 'settings' (Cài đặt) */
   function show(name) {
     if (!WS_ORDER.includes(name)) return;
     const was = ws;
@@ -1291,16 +1474,21 @@
     if (other) E.commitText && E.commitText();
     if (!doc) flushVisual();
     if (was === 'design' && name !== 'design' && DE.pages) DE.pages.onHide();
+    if (was === 'settings' && name !== 'settings' && DE.settings) DE.settings.onHide();
     document.body.classList.toggle('ws-doc', doc);
     document.body.classList.toggle('ws-guide', name === 'guide');
+    document.body.classList.toggle('ws-settings', name === 'settings');
     document.body.classList.toggle('ws-design', name === 'design');
     document.body.classList.toggle('ws-nodiagram', other);
     docview.hidden = !doc;
     $('#guideview').hidden = name !== 'guide';
     const dv = $('#designview');
     if (dv) dv.hidden = name !== 'design';
+    const sv = $('#settingsview');
+    if (sv) sv.hidden = name !== 'settings';
     if (name === 'guide' && DE.guide) DE.guide.render();
     if (name === 'design' && DE.pages) DE.pages.onShow();
+    if (name === 'settings' && was !== 'settings' && DE.settings) DE.settings.onShow(was);
     ['#toolbar', '#stage', '#statusbar'].forEach((q) => ($(q).inert = other));
     ['#palette', '#inspector'].forEach((q) => {
       const el = $(q);
@@ -1406,6 +1594,7 @@
     $('#doc-dirty').hidden = !state.dirty;
     if (ws === 'doc') document.title = (state.dirty ? '● ' : '') + name + ' – Diagram Editor';
     else if (ws === 'guide') document.title = 'Hướng dẫn sử dụng – Diagram Editor';
+    else if (ws === 'settings') document.title = 'Cài đặt – Diagram Editor';
     else if (ws === 'design') document.title = DE.pages ? DE.pages.title() : 'Thiết kế trang – Diagram Editor';
     else document.title = (store.doc.meta?.name ? store.doc.meta.name + ' – ' : '') + 'Diagram Editor (BPMN, UML, Flowchart)';
   }
@@ -1576,6 +1765,23 @@
 
     // ------------------------------------------------------------- preview
     pv.addEventListener('click', (e) => {
+      const pb = e.target.closest('[data-pua]');
+      if (pb) {
+        const blk = pb.closest('.md-plantuml');
+        if (pb.dataset.pua === 'edit') return editRich(blk);
+        if (pb.dataset.pua === 'whiteboard') return plantumlToDiagram(blk);
+        const r = DE.mdRich && DE.mdRich.plantumlDoc(blk.getAttribute('data-src'));
+        if (r && r.ok) DE.download((r.doc.meta.name || 'plantuml').replace(/[\\/:*?"<>|]+/g, '_') + '.svg', new Blob([DE.exportSVG(r.doc)], { type: 'image/svg+xml' }));
+        return;
+      }
+      const mb = e.target.closest('[data-mma]');
+      if (mb) {
+        const blk = mb.closest('.md-mermaid');
+        if (mb.dataset.mma === 'edit') return editRich(blk);
+        const svg = DE.mdRich && DE.mdRich.mermaidSVG(blk.getAttribute('data-src'));
+        if (svg) DE.download('so-do-mermaid.svg', new Blob([svg], { type: 'image/svg+xml' }));
+        return;
+      }
       const btn = e.target.closest('[data-dga]');
       if (btn) {
         const id = btn.closest('figure').dataset.dg;
@@ -1611,6 +1817,12 @@
       if (fig && !fig.classList.contains('missing')) {
         e.preventDefault();
         return startSession({ kind: 'edit', id: fig.dataset.dg, doc: state.diagrams[fig.dataset.dg] });
+      }
+      // Mermaid, công thức, front matter, chú thích, khối HTML: hộp thoại sửa mã
+      const rich = e.target.closest('.md-math, .md-raw');
+      if (rich && pv.contains(rich)) {
+        e.preventDefault();
+        editRich(rich);
       }
     });
 
@@ -1657,7 +1869,7 @@
     updateSessionUI();
     renderPreview();
     const savedWs = lsGet(WS_KEY);
-    show(resumed ? 'diagram' : ['doc', 'design', 'guide'].includes(savedWs) ? savedWs : 'diagram');
+    show(resumed ? 'diagram' : ['doc', 'design', 'guide', 'settings'].includes(savedWs) ? savedWs : 'diagram');
     if (resumed) setTimeout(() => toast('Tiếp tục phiên vẽ diagram cho tài liệu – bấm ✓ để đưa vào tài liệu, hoặc Huỷ', 'info'), 400);
     store.onChange(() => ws === 'diagram' && updateTitles());
   };
@@ -1801,6 +2013,7 @@
   DOCS.contextForAI = function () {
     flushVisual();
     if (ws === 'guide') return '[Tab hiện tại: Hướng dẫn sử dụng]';
+    if (ws === 'settings') return '[Tab hiện tại: Cài đặt]';
     if (ws !== 'doc') return null; // tab Diagram / Thiết kế trang: ui.js tự gửi kèm dữ liệu của tab
     const text = ta.value;
     let s = `[Tab hiện tại: Tài liệu – file "${state.name}"]\n`;
@@ -1868,6 +2081,18 @@
         if (files.length > 1) toast('Mỗi lần mở được một file .md – đã mở "' + md.name + '"', 'info');
         return DOCS.openFile(md);
       }
+      // PlantUML: tab Tài liệu -> chèn khối ```plantuml · tab khác -> mở thành diagram trên whiteboard
+      const puml = files.find((f) => /\.(puml|plantuml|pu|iuml|wsd)$/i.test(f.name));
+      if (puml) {
+        if (ws === 'doc')
+          return puml.text().then((t) => {
+            insertBlock('```plantuml\n' + t.trim() + '\n```', caretPos());
+            renderPreview();
+            toast(`Đã chèn sơ đồ PlantUML từ "${puml.name}"`, 'ok');
+          });
+        show('diagram');
+        return DE.ui.openDiagramFile(puml);
+      }
       const json = files.find(isJsonFile);
       if (json) {
         if (ws === 'design' && DE.pages) return DE.pages.openFile(json);
@@ -1904,6 +2129,10 @@
       toast(`Đã tải xuống "${state.name}"`, 'ok');
     },
     'export-html': exportHTML,
+    mermaid: () => insertMermaid(),
+    math: () => insertMath(),
+    footnote: () => insertFootnote(),
+    toc: () => insertToc(),
     'new-diagram': () => startSession({ kind: 'insert', pos: caretPos() }),
     'insert-current': () => {
       if (session) return show('diagram');
@@ -1914,11 +2143,11 @@
 
   function onGlobalKey(e) {
     if (document.querySelector('.modal-backdrop')) return;
-    if (e.altKey && !e.ctrlKey && !e.metaKey && ['1', '2', '3', '4'].includes(e.key)) {
+    if (e.altKey && !e.ctrlKey && !e.metaKey && ['1', '2', '3', '4', '5'].includes(e.key)) {
       e.preventDefault();
       return show(WS_ORDER[+e.key - 1]);
     }
-    if (ws === 'diagram' || ws === 'design') return; // tab Hướng dẫn: Ctrl+S / Ctrl+O vẫn thao tác trên tài liệu
+    if (ws === 'diagram' || ws === 'design') return; // tab Hướng dẫn / Cài đặt: Ctrl+S / Ctrl+O vẫn thao tác trên tài liệu
     const mod = e.ctrlKey || e.metaKey;
     if (!mod || e.altKey) return;
     const k = e.key.toLowerCase();
@@ -1961,5 +2190,46 @@
 .md-preview .md-alert-caution{border-color:#d1242f}.md-preview .md-alert-caution .md-alert-title{color:#d1242f}
 .md-preview figure.md-diagram{position:relative;margin:0 0 1em;text-align:center}
 .md-preview figure.md-diagram svg{max-width:100%;height:auto;border-radius:6px}
+.md-preview .md-mermaid{position:relative;margin:0 0 1em;padding:14px;text-align:center;background:#fff;border:1px solid var(--md-border,#d1d9e0);border-radius:8px;overflow-x:auto}
+.md-preview .md-mermaid-img{display:inline-block;max-width:100%;height:auto;vertical-align:top}
+.md-preview .md-plantuml{position:relative;margin:0 0 1em;padding:10px;text-align:center;background:#fff;border:1px solid var(--md-border,#d1d9e0);border-radius:8px;overflow-x:auto}
+.md-preview .md-puml-svg svg{max-width:100%;height:auto;vertical-align:top}
+.md-preview .md-puml-warn{margin:6px 0 0;text-align:left;font-size:.8em;color:#7d4e00}
+.md-preview .md-puml-warn summary{cursor:pointer}.md-preview .md-puml-warn ul{margin:.3em 0 0;padding-left:1.4em}
+.md-preview .md-mermaid-src{margin:0;text-align:left;background:none;color:var(--md-muted,#59636e);font-size:.85em;white-space:pre-wrap}
+.md-preview .md-mermaid-err{display:flex;flex-direction:column;gap:4px;margin:0 0 8px;padding:8px 12px;text-align:left;border-radius:6px;background:#fff8c5;color:#7d4e00;font-size:.85em}
+.md-preview .md-mermaid-err span{white-space:pre-wrap;font-family:Consolas,Menlo,monospace;font-size:.95em}
+.md-preview .md-math-block{margin:0 0 1em;padding:.2em 0;overflow-x:auto;overflow-y:hidden;text-align:center}
+.md-preview .md-math-block .katex-display{margin:0}
+.md-preview .md-math-block math[display=block]{margin:0}
+.md-preview .md-math-error{color:#d1242f;font-family:Consolas,Menlo,monospace;font-size:.9em}
+.md-preview .md-math-inline-display{display:inline-block;max-width:100%;overflow-x:auto;vertical-align:middle}
+.md-preview .md-emoji{font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;font-style:normal}
+.md-preview .md-fn-ref{font-size:.75em;line-height:0}
+.md-preview .md-fn-ref a{text-decoration:none}.md-preview .md-fn-ref a::before{content:"["}.md-preview .md-fn-ref a::after{content:"]"}
+.md-preview .md-footnotes{margin:2em 0 1em;padding-top:.8em;border-top:1px solid var(--md-border,#d1d9e0);font-size:.875em;color:var(--md-muted,#59636e)}
+.md-preview .md-fn-title{margin:0 0 .5em;font-weight:600;color:var(--md-text,#1f2328)}
+.md-preview .md-footnotes ol{margin:0;padding-left:1.8em}.md-preview .md-footnotes li+li{margin-top:.3em}
+.md-preview .md-fn-back{margin-left:.3em;text-decoration:none}
+.md-preview .md-toc{margin:0 0 1em;padding:12px 18px;background:var(--md-pre-bg,#f6f8fa);border:1px solid var(--md-border,#d1d9e0);border-radius:8px}
+.md-preview .md-toc-title{margin:0 0 .4em;font-weight:600}
+.md-preview .md-toc-list{margin:0;padding:0;list-style:none}.md-preview .md-toc-list li{margin:.2em 0}
+.md-preview .md-toc-l2{padding-left:1.2em}.md-preview .md-toc-l3{padding-left:2.4em}.md-preview .md-toc-l4{padding-left:3.6em}.md-preview .md-toc-l5,.md-preview .md-toc-l6{padding-left:4.8em}
+.md-preview .md-toc-empty{margin:0;color:var(--md-muted,#59636e);font-style:italic}
+.md-preview .md-frontmatter{margin:0 0 1.2em;overflow:auto}
+.md-preview .md-frontmatter table{width:auto;font-size:.85em}
+.md-preview .md-frontmatter th{text-align:left;white-space:nowrap;color:var(--md-muted,#59636e)}
+.md-preview pre[data-lang]{position:relative}
+.md-preview pre[data-lang]::after{content:attr(data-lang);position:absolute;top:6px;right:10px;font:600 10.5px/1 -apple-system,"Segoe UI",sans-serif;color:var(--md-muted,#59636e);opacity:.75;pointer-events:none}
+.md-preview .hljs-comment,.md-preview .hljs-quote{color:var(--hl-comment,#6e7781);font-style:italic}
+.md-preview .hljs-keyword,.md-preview .hljs-selector-tag,.md-preview .hljs-doctag,.md-preview .hljs-section,.md-preview .hljs-meta .hljs-keyword{color:var(--hl-keyword,#cf222e)}
+.md-preview .hljs-string,.md-preview .hljs-regexp,.md-preview .hljs-meta .hljs-string{color:var(--hl-string,#0a3069)}
+.md-preview .hljs-number,.md-preview .hljs-literal,.md-preview .hljs-symbol,.md-preview .hljs-bullet,.md-preview .hljs-attr,.md-preview .hljs-attribute,.md-preview .hljs-property,.md-preview .hljs-selector-attr,.md-preview .hljs-selector-class,.md-preview .hljs-selector-id{color:var(--hl-number,#0550ae)}
+.md-preview .hljs-title,.md-preview .hljs-title.function_,.md-preview .hljs-title.class_,.md-preview .hljs-meta{color:var(--hl-title,#8250df)}
+.md-preview .hljs-built_in,.md-preview .hljs-type,.md-preview .hljs-variable,.md-preview .hljs-template-variable,.md-preview .hljs-params{color:var(--hl-builtin,#953800)}
+.md-preview .hljs-name,.md-preview .hljs-tag,.md-preview .hljs-selector-pseudo{color:var(--hl-tag,#116329)}
+.md-preview .hljs-addition{color:var(--hl-tag,#116329);background:var(--hl-add-bg,#dafbe1)}
+.md-preview .hljs-deletion{color:var(--hl-keyword,#82071e);background:var(--hl-del-bg,#ffebe9)}
+.md-preview .hljs-emphasis{font-style:italic}.md-preview .hljs-strong{font-weight:700}.md-preview .hljs-link{text-decoration:underline}
 `;
 })(window.DE);

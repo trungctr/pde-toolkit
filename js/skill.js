@@ -281,7 +281,8 @@
     L.push('## Cách trả lời khi viết hoặc sửa tài liệu');
     L.push('1. Trả về **TOÀN BỘ** tài liệu sau khi viết/sửa trong đúng **một** khối bọc bằng BỐN dấu backtick: dòng đầu ````` ````markdown `````, dòng cuối ````` ```` `````. (Bốn dấu để các khối ``` bên trong không làm đóng khối ngoài.) App sẽ thay nội dung tài liệu bằng khối này – người dùng có nút Hoàn tác.');
     L.push('2. Ngoài khối đó chỉ giải thích ngắn (tối đa 3 câu) đã làm gì. Viết bằng ngôn ngữ người dùng đang dùng.');
-    L.push('3. Dùng Markdown CommonMark + GFM: tiêu đề `#`…`######`, đoạn văn, **đậm**, *nghiêng*, ~~gạch~~, `code`, danh sách `-` / `1.`, việc cần làm `- [ ]` / `- [x]`, bảng GFM, trích dẫn `>`, ghi chú kiểu GitHub (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`), khối code có tên ngôn ngữ, link `[chữ](url)`, ảnh `![mô tả](url)`, đường kẻ `---`. **Không dùng HTML.**');
+    L.push('3. Dùng Markdown CommonMark + GFM: tiêu đề `#`…`######`, đoạn văn, **đậm**, *nghiêng*, ~~gạch~~, ==tô sáng==, `code`, danh sách `-` / `1.`, việc cần làm `- [ ]` / `- [x]`, bảng GFM, trích dẫn `>`, ghi chú kiểu GitHub (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`), khối code có tên ngôn ngữ (app tô màu cú pháp), link `[chữ](url)`, ảnh `![mô tả](url)`, đường kẻ `---`. **Không dùng HTML.**');
+    L.push('   App còn hiển thị: công thức LaTeX `$…$` (trong dòng) và `$$ … $$` trên các dòng riêng (khối); chú thích cuối trang `[^1]` + dòng `[^1]: nội dung`; emoji `:rocket:`; mục lục tự động bằng một dòng `[TOC]`; sơ đồ ```` ```mermaid ```` (chỉ dùng cho loại app không vẽ được trên whiteboard: Gantt, biểu đồ tròn, sơ đồ tư duy, timeline, gitGraph, journey, quadrantChart…); khối ```` ```plantuml ```` (app tự dịch sang diagram – giữ nguyên nếu người dùng đã viết PlantUML, nhưng khi tự vẽ mới thì dùng ```` ```diagram ````).');
     L.push('4. Nếu người dùng chỉ hỏi, nhờ giải thích hoặc góp ý (không yêu cầu thay đổi tài liệu): trả lời bằng chữ, KHÔNG trả khối ````markdown.');
     L.push('5. Khi sửa: giữ nguyên các phần người dùng không yêu cầu đổi (câu chữ, thứ tự, định dạng).');
     L.push('');
@@ -289,6 +290,7 @@
     L.push('- Chèn diagram MỚI: đặt một khối rào ```` ```diagram ```` (3 backtick, ngôn ngữ `diagram`) trên các dòng riêng, ngay tại vị trí muốn hiển thị. Bên trong là JSON diagram ĐẦY ĐỦ theo đúng SKILL diagram (`version`, `meta` có `name` và `mode`, `nodes`, `edges`). App biến khối đó thành diagram vẽ sẵn, người dùng sửa tiếp được trên whiteboard.');
     L.push('- Diagram ĐÃ CÓ trong tài liệu hiện ra là một dòng `[[diagram:<id>|<tên>]]`. Giữ NGUYÊN dòng đó (đúng vị trí) nếu không cần sửa diagram.');
     L.push('- Sửa diagram đã có: thay dòng `[[diagram:<id>|…]]` bằng khối ```` ```diagram ```` chứa JSON đã sửa và thêm trường `"embedId": "<id>"` ở gốc JSON (JSON gốc của các diagram đã có được gửi kèm tin nhắn). Xoá diagram: bỏ dòng đó.');
+    L.push('- Flowchart / BPMN / UML / ERD: luôn dùng ```` ```diagram ```` (người dùng sửa được trên whiteboard), KHÔNG dùng Mermaid cho các loại này. Tiến độ dự án (Gantt), tỉ lệ (pie), sơ đồ tư duy, dòng thời gian: dùng ```` ```mermaid ````.');
     L.push('- Chọn loại diagram hợp với nội dung: quy trình nghiệp vụ → BPMN hoặc Activity; luồng thuật toán → Flowchart; tác nhân & chức năng → Use Case; tương tác giữa các thành phần theo thời gian → Sequence; dữ liệu → ERD / Class; trạng thái → State Machine; kiến trúc → Component / Deployment. Mỗi diagram nên gọn (thường 5–20 hình), tên `meta.name` mô tả rõ.');
     L.push('');
     L.push('## Gợi ý cấu trúc tài liệu phần mềm');
@@ -303,11 +305,12 @@
     L.push('- **Tab Hướng dẫn**: người dùng đang đọc hướng dẫn sử dụng – trả lời câu hỏi về cách dùng app bằng chữ, ngắn gọn, theo từng bước.');
     L.push('');
     L.push('## Cách dùng app (để trả lời câu hỏi của người dùng)');
-    L.push('- 4 tab trên cùng: Tài liệu (Alt+1), Diagram (Alt+2), Thiết kế trang (Alt+3), Hướng dẫn (Alt+4). Khung chat AI có ở mọi tab.');
+    L.push('- 5 tab trên cùng: Tài liệu (Alt+1), Diagram (Alt+2), Thiết kế trang (Alt+3), Hướng dẫn (Alt+4), Cài đặt (Alt+5, góc phải). Khung chat AI có ở mọi tab trừ Cài đặt.');
+    L.push('- Cài đặt (tab ⚙): Giao diện (sáng / tối / theo hệ thống), Trợ lý AI (nhà cung cấp, API key, mô hình, effort, thinking), Giọng nói (micro, bộ nhận dạng, giọng đọc), Ứng dụng & dữ liệu (cài như ứng dụng, offline, dung lượng đã lưu).');
     L.push('- Thiết kế trang: kéo thành phần (khối trang, hàng, cột, nút, ảnh, menu, bảng, biểu mẫu, mẫu dựng sẵn) từ thư viện bên trái vào trang; nhấn đúp để sửa chữ; bảng Thuộc tính bên phải chia nhóm (Định dạng, Loại nút, Hiệu ứng khi di chuột qua / khi bấm…); tab Lớp để sắp xếp; Máy tính / Máy tính bảng / Điện thoại để xem từng cỡ màn hình; "▶ Xem thử" để chạy thử; tải HTML (mọi trang trong một file) hoặc JSON.');
     L.push('- Tài liệu: gõ trực tiếp như Word, thanh công cụ định dạng; "◆ Diagram mới" mở tab Diagram để vẽ rồi "✓ Chèn vào tài liệu"; rê chuột lên diagram → "✎ Sửa" (hoặc nhấn đúp). Mở / lưu file .md bằng Ctrl+O / Ctrl+S hoặc kéo thả file vào cửa sổ. File .md lưu diagram dạng SVG + JSON. Nút "</> Developer" hiện mã Markdown.');
     L.push('- Diagram: chọn chế độ Flowchart / BPMN / UML; kéo hình từ thư viện bên trái; rê chuột lên hình rồi kéo từ chấm xanh để nối; nhấn đúp để sửa chữ; bảng Thuộc tính bên phải; tab JSON để sửa dữ liệu; tải JSON / SVG / PNG.');
-    L.push('- Chat AI: bấm chip API key để chọn nhà cung cấp (có gói miễn phí: Google Gemini, OpenRouter, Groq…), Ctrl+Enter để gửi, Ctrl+M để nói.');
+    L.push('- Chat AI: chọn nhà cung cấp ở tab Cài đặt → Trợ lý AI (hoặc nút cài đặt ở góc khung chat; có gói miễn phí: Google Gemini, OpenRouter, Groq…); đổi mô hình nhanh bằng dropdown trên khung chat; Ctrl+Enter để gửi, Ctrl+M để nói.');
     L.push('');
     L.push('## Ví dụ trả lời (tab Tài liệu)');
     L.push('Đã viết đặc tả đăng nhập gồm luồng xử lý và quy tắc nghiệp vụ.');

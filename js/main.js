@@ -30,11 +30,11 @@
     DE.store.load(initial, { history: false });
     DE.editor.init(document.getElementById('stage'));
     DE.ui.init();
+    initPWA(); // trước docs.init: tab Cài đặt (có thể mở lại ngay khi tải) đọc trạng thái cài ứng dụng
     if (DE.pages) DE.pages.init(); // trước docs.init: docs có thể mở lại tab Thiết kế trang ngay khi tải
     DE.docs.init();
     DE.store.onChange(autosave);
     requestAnimationFrame(() => DE.editor.fit());
-    initPWA();
     // API nhỏ để thao tác qua DevTools console
     window.diagram = {
       get json() {
@@ -78,26 +78,34 @@
       });
     }
 
-    // Nút "Cài đặt ứng dụng" – chỉ hiện khi trình duyệt cho phép cài
-    const btn = document.getElementById('install-btn');
+    // Cài như ứng dụng: tab Cài đặt hiện nút khi trình duyệt cho phép cài
     let deferred = null;
-    const standalone = () => window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    const listeners = [];
+    const changed = () => listeners.forEach((f) => f());
+    const standalone = () => !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    DE.pwa = {
+      /** 'installed' (đang chạy như ứng dụng) | 'ready' (cài được ngay) | 'unavailable' */
+      state: () => (standalone() ? 'installed' : deferred ? 'ready' : 'unavailable'),
+      offline: () => /^https?:$/.test(location.protocol) && 'serviceWorker' in navigator && !!navigator.serviceWorker.controller,
+      install: async () => {
+        if (!deferred) return false;
+        const d = deferred;
+        deferred = null; // mỗi sự kiện chỉ hỏi được một lần; từ chối thì trình duyệt sẽ báo lại sau
+        d.prompt();
+        const choice = await d.userChoice.catch(() => null);
+        changed();
+        return !!(choice && choice.outcome === 'accepted');
+      },
+      onChange: (f) => listeners.push(f),
+    };
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferred = e;
-      if (btn && !standalone()) btn.hidden = false;
+      changed();
     });
-    btn &&
-      btn.addEventListener('click', async () => {
-        if (!deferred) return;
-        btn.hidden = true;
-        deferred.prompt();
-        const choice = await deferred.userChoice.catch(() => null);
-        deferred = null;
-        if (choice && choice.outcome !== 'accepted') btn.hidden = false;
-      });
     window.addEventListener('appinstalled', () => {
-      if (btn) btn.hidden = true;
+      deferred = null;
+      changed();
       DE.ui.toast('Đã cài đặt Diagram Editor – có thể mở từ màn hình chính / menu ứng dụng', 'ok');
     });
   }

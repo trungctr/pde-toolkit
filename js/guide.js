@@ -3,7 +3,8 @@
  * Nội dung viết bằng Markdown (DE.GUIDE_MD), render bằng js/markdown.js.
  *  - Mục lục bên trái (tự sinh từ tiêu đề), tìm kiếm lọc theo mục.
  *  - Dòng "💬 Tài liệu: …" / "💬 Diagram: …" / "💬 Trang: …" có nút "Thử" – gửi ví dụ vào khung chat AI.
- *  - Link [chữ](#go-doc) / (#go-diagram) / (#go-design) chuyển sang tab tương ứng.
+ *  - Link [chữ](#go-doc) / (#go-diagram) / (#go-design) chuyển sang tab tương ứng;
+ *    (#go-settings-ai) / (#go-settings-voice) / (#go-settings-look) / (#go-settings-app) mở tab Cài đặt đúng nhóm.
  * ========================================================================= */
 (function (DE) {
   'use strict';
@@ -29,12 +30,12 @@ viết giúp cả tài liệu, diagram lẫn trang web. Mọi thứ chạy ngay 
 - 💬 Trang: Dựng trang giới thiệu cho tiệm bánh ngọt: thanh điều hướng, ảnh bìa, 3 món nổi bật và form đặt bánh
 
 > [!TIP]
-> Khung chat AI có ở mọi tab. Lần đầu dùng, bấm chip **API key** trong khung chat để chọn nhà cung cấp AI
+> Khung chat AI có ở mọi tab. Lần đầu dùng, mở **[⚙ Cài đặt → Trợ lý AI](#go-settings-ai)** để chọn nhà cung cấp AI
 > (có nhiều lựa chọn miễn phí – xem mục [Chat AI](#chat-ai)).
 
 ## Giao diện
 
-Bốn tab ở trên cùng:
+Năm tab ở trên cùng:
 
 | Tab | Phím tắt | Dùng để |
 | --- | --- | --- |
@@ -42,8 +43,21 @@ Bốn tab ở trên cùng:
 | ◆ **Diagram** | \`Alt+2\` | Whiteboard vẽ diagram |
 | ▤ **Thiết kế trang** | \`Alt+3\` | Dựng trang web bằng kéo thả, xuất file HTML |
 | ❓ **Hướng dẫn** | \`Alt+4\` | Trang bạn đang đọc |
+| ⚙ **Cài đặt** | \`Alt+5\` | Sáng / tối, trợ lý AI, giọng nói, cài như ứng dụng (tab ở góc phải) |
 
 Thanh công cụ chia thành **các nhóm**; khi cửa sổ hẹp, các nhóm tự **xuống hàng** để mọi nút vẫn luôn hiện đủ.
+
+### Cài đặt
+
+Mọi cài đặt chung nằm ở tab **⚙ Cài đặt** (\`Alt+5\`), chia 4 nhóm ở cột trái. Đổi là lưu ngay (riêng phần nhà cung cấp AI
+bấm **Lưu cài đặt AI**). Nút **← Quay lại** ở góc dưới trái đưa bạn về tab đang làm.
+
+| Nhóm | Có gì |
+| --- | --- |
+| [Giao diện](#go-settings-look) | Chế độ **sáng**, **tối** hoặc **theo hệ thống** (tự đổi theo máy) |
+| [Trợ lý AI](#go-settings-ai) | Nhà cung cấp, API key, mô hình; **effort** (mức suy luận) và **thinking** (bật / tắt suy luận) |
+| [Giọng nói](#go-settings-voice) | Bộ nhận dạng (có bản offline), micro, ngôn ngữ, lệnh giọng nói, giọng đọc |
+| [Ứng dụng & dữ liệu](#go-settings-app) | Cài như ứng dụng, trạng thái chạy offline, dung lượng đã lưu trong trình duyệt, phím tắt chung |
 
 ## Soạn tài liệu
 
@@ -51,7 +65,7 @@ Thanh công cụ chia thành **các nhóm**; khi cửa sổ hẹp, các nhóm t�
 
 Gõ trực tiếp vào trang. Thanh công cụ (từ trái sang): **Mới · Mở · Lưu · tên file** – **H1 H2 H3** (tiêu đề) –
 **B** đậm · *I* nghiêng · ~~S~~ gạch · \`</>\` code – liên kết · ảnh – danh sách · danh sách số · việc cần làm –
-trích dẫn · khối code · bảng · đường kẻ.
+trích dẫn · khối code · bảng · đường kẻ – **∑** công thức · **Mermaid** · **[1]** chú thích · mục lục.
 
 - Bôi đen chữ rồi bấm nút để định dạng; bấm lại để bỏ.
 - \`Ctrl+B\` đậm · \`Ctrl+I\` nghiêng · \`Ctrl+K\` liên kết · \`Ctrl+E\` code · \`Tab\` / \`Shift+Tab\` thụt lề danh sách.
@@ -74,6 +88,51 @@ trích dẫn · khối code · bảng · đường kẻ.
 
 > [!NOTE]
 > Khi bạn vẽ / sửa diagram cho tài liệu, diagram đang vẽ dở ở tab Diagram được cất lại và trả về nguyên vẹn khi xong.
+
+### Công thức, Mermaid, chú thích, mục lục
+
+Tài liệu hiển thị được những gì GitHub, VS Code, Obsidian, Typora hiển thị. Không cần nhớ cú pháp: dùng các nút
+**∑** (công thức), **Mermaid**, **[1]** (chú thích) và nút **mục lục** trên thanh công cụ. **Nhấn đúp** vào sơ đồ Mermaid,
+công thức, chú thích hay bảng thông tin đầu tài liệu để sửa – hộp thoại có **xem trước** ngay.
+
+| Muốn có | Viết trong Markdown (chế độ developer) |
+| --- | --- |
+| Công thức trong dòng | \`$E=mc^2$\` (hoặc \`$\`…\`$\` kiểu GitHub) |
+| Công thức riêng một khối | dòng \`$$\`, công thức, dòng \`$$\` – hoặc khối \`\` \`\`\`math \`\` |
+| Sơ đồ Mermaid (Gantt, biểu đồ tròn, sơ đồ tư duy, tuần tự, timeline…) | khối \`\` \`\`\`mermaid \`\` |
+| Chú thích cuối trang | \`[^1]\` trong câu, và một dòng \`[^1]: nội dung\` |
+| Mục lục tự động | một dòng \`[TOC]\` |
+| Emoji | \`:rocket:\` \`:tada:\` \`:white_check_mark:\` (tên giống GitHub) |
+| Tô sáng chữ | \`==chữ==\` |
+| Hộp ghi chú màu | \`> [!NOTE]\` · \`> [!TIP]\` · \`> [!WARNING]\`… và kiểu Obsidian \`> [!tip] Tiêu đề riêng\` |
+| Thông tin đầu tài liệu (front matter) | khối \`---\` … \`---\` ở đầu file, mỗi dòng \`khoá: giá trị\` |
+
+- **Khối code** có tên ngôn ngữ (\`\`\`js, \`\`\`python, \`\`\`sql…) được **tô màu cú pháp**.
+- Sơ đồ Mermaid dùng cho loại whiteboard không vẽ: tiến độ (Gantt), tỉ lệ (biểu đồ tròn), sơ đồ tư duy, dòng thời gian, nhánh Git…
+  Lưu đồ, BPMN, UML, ERD nên vẽ bằng **◆ Diagram mới** để sửa kéo thả được.
+- Thư viện vẽ (Mermaid, KaTeX, highlight.js) được tải từ internet **ở lần dùng đầu tiên**, sau đó chạy cả khi offline.
+  Khi chưa tải được, tài liệu vẫn hiện mã gốc và không mất gì.
+- File \`.md\` lưu đúng cú pháp chuẩn ở trên, nên mở trên GitHub, VS Code, Obsidian vẫn hiển thị. File **HTML** xuất ra chứa sẵn
+  hình sơ đồ và công thức, không cần mạng.
+
+### Sơ đồ PlantUML
+
+Có sẵn mã PlantUML (\`@startuml\` … \`@enduml\`)? Ứng dụng **tự dịch** nó thành diagram của whiteboard và vẽ ngay trên máy –
+**không gửi mã lên máy chủ nào**.
+
+| Muốn | Làm |
+| --- | --- |
+| Đưa vào tài liệu | **Dán** mã PlantUML vào trang (tự bọc thành khối \`\` \`\`\`plantuml \`\`), hoặc kéo thả file \`.puml\` vào tab Tài liệu |
+| Sửa mã | **Nhấn đúp** vào sơ đồ (hoặc nút **✎ Mã**) – hộp thoại có xem trước |
+| Sửa kéo thả | Nút **◆ Sửa trên whiteboard**: khối PlantUML được thay bằng diagram nhúng, mở ở tab Diagram để sửa tự do |
+| Mở thành diagram | Nút **Mở** ở tab Diagram chọn file \`.puml\`, kéo thả file vào tab Diagram, hoặc dán mã vào ô **JSON** rồi **Áp dụng** |
+
+- Hỗ trợ: **sequence** (tuần tự), **use case**, **class**, **activity** (cả cú pháp mới và cũ, có làn bơi), **state**,
+  **component / deployment**, **ER** (cơ sở dữ liệu, chân chim).
+- Màu sắc, \`skinparam\`, \`!include\` và vài lệnh hiếm được **bỏ qua** – ở tab Tài liệu có dòng ⚠ liệt kê những gì đã bỏ qua.
+- Loại khác (mindmap, gantt, wireframe…) hiện thông báo rõ ràng kèm mã gốc; dùng \`\` \`\`\`mermaid \`\` cho các loại này.
+- File \`.md\` vẫn giữ nguyên mã PlantUML, nên mở ở nơi khác (VS Code, GitLab…) vẫn dùng được. Sau khi **◆ Sửa trên whiteboard**
+  thì khối đó trở thành diagram của ứng dụng (không còn mã PlantUML).
 
 ### Mở, lưu và kéo thả
 
@@ -197,10 +256,12 @@ Thẻ, ảnh, hàng, cột… cũng có nhóm hiệu ứng này (ví dụ thẻ 
 
 ### Cài đặt lần đầu
 
-1. Bấm chip **API key** trong khung chat.
+1. Mở **[⚙ Cài đặt → Trợ lý AI](#go-settings-ai)** (hoặc nút cài đặt ở góc khung chat – chấm cam nghĩa là chưa có key).
 2. Chọn nhà cung cấp – có gói **miễn phí**: **Google Gemini**, **OpenRouter** (mô hình 🆓), **Groq**, **Cerebras**, **Mistral**;
    hoặc chạy trên máy với **Ollama** / **LM Studio**. Bấm “Lấy API key ↗” để tạo key.
-3. Dán key, chọn mô hình, bấm **Áp dụng**.
+3. Dán key, chọn mô hình, bấm **Lưu cài đặt AI**. Ngay bên dưới có **Effort** và **Thinking** để AI trả lời kỹ hơn hay nhanh hơn.
+
+Đổi mô hình nhanh: dropdown mô hình ngay trên khung chat.
 
 > [!IMPORTANT]
 > API key chỉ lưu trong trình duyệt này và chỉ gửi thẳng tới nhà cung cấp bạn chọn. Không nên lưu key trên máy dùng chung.
@@ -216,7 +277,14 @@ AI biết bạn đang ở tab nào:
   Không ưng: **↶ Hoàn tác thay đổi của AI** hoặc \`Ctrl+Z\`.
 - **Tab Hướng dẫn** – hỏi AI cách dùng công cụ.
 
-Gửi bằng nút **Gửi** hoặc \`Ctrl+Enter\`. AI nhớ các lượt trước trong cuộc trò chuyện; nút ↻ để bắt đầu cuộc trò chuyện mới.
+Gửi bằng nút **Gửi** hoặc \`Ctrl+Enter\`. Các lượt hỏi – đáp hiện trong khung tin nhắn và AI nhớ chúng.
+
+| Nút | Ở đâu | Việc |
+| --- | --- | --- |
+| 🗑 **Xoá hội thoại** | góc trên trái khung chat | Xoá lịch sử, bắt đầu cuộc trò chuyện mới |
+| ⇕ Thu gọn khung tin nhắn | góc trên phải | Ẩn lịch sử, chỉ giữ ô nhập (gửi tin mới thì tự mở lại) |
+| ⤡ Thu nhỏ khung chat | góc trên phải | Thu khung chat thành nút **Chat AI** |
+| ↶ **Hoàn tác thay đổi của AI** | trong câu trả lời | Trả tài liệu / trang về như trước lần AI sửa gần nhất |
 
 ### Ví dụ yêu cầu (bấm “Thử” để gửi vào khung chat)
 
@@ -244,13 +312,13 @@ ChatGPT, Gemini, Claude… kèm yêu cầu. Sau đó:
 - Bấm 🎤 trong khung chat hoặc \`Ctrl+M\` rồi nói – nói xong app tự gửi cho AI.
 - \`Ctrl+Shift+M\` (🎧): **rảnh tay** – nghe, gửi, đọc kết quả, rồi nghe tiếp.
 - Ở tab Diagram, câu ngắn như “hoàn tác”, “vừa màn hình”, “xoá” chạy ngay như lệnh. Câu “hướng dẫn” mở trang này.
-- Chuột phải vào 🎤 để chọn micro, bộ nhận dạng (có bản offline) và giọng đọc.
+- Chọn micro, bộ nhận dạng (có bản offline) và giọng đọc ở **[⚙ Cài đặt → Giọng nói](#go-settings-voice)** (hoặc chuột phải vào 🎤).
 
 ## Phím tắt
 
 | Ở đâu | Phím | Việc |
 | --- | --- | --- |
-| Mọi nơi | \`Alt+1\` / \`Alt+2\` / \`Alt+3\` / \`Alt+4\` | Tab Tài liệu / Diagram / Thiết kế trang / Hướng dẫn |
+| Mọi nơi | \`Alt+1\` … \`Alt+5\` | Tab Tài liệu / Diagram / Thiết kế trang / Hướng dẫn / Cài đặt |
 | Mọi nơi | \`Ctrl+Enter\` (trong ô chat) | Gửi cho AI |
 | Mọi nơi | \`Ctrl+M\` · \`Ctrl+Shift+M\` | Nói với AI · rảnh tay |
 | Tài liệu | \`Ctrl+S\` · \`Ctrl+Shift+S\` · \`Ctrl+O\` | Lưu · lưu thành · mở |
@@ -275,7 +343,7 @@ Trong trình duyệt của bạn (tự lưu) và trong file bạn lưu ra. Khôn
 gửi cho nhà cung cấp AI khi chat.
 
 **Dùng không có mạng được không?**
-Được. Bấm **⬇ Cài đặt ứng dụng** ở thanh trạng thái (hoặc biểu tượng cài trên thanh địa chỉ) để dùng như một ứng dụng, kể cả offline.
+Được. Vào **[⚙ Cài đặt → Ứng dụng & dữ liệu](#go-settings-app)** → **⬇ Cài đặt ứng dụng** (hoặc biểu tượng cài trên thanh địa chỉ) để dùng như một ứng dụng, kể cả offline.
 Chat AI cần mạng (trừ khi dùng Ollama / LM Studio trên máy).
 
 **Mở file .md trong VS Code không thấy diagram?**
@@ -359,6 +427,8 @@ hosting tĩnh nào (GitHub Pages, Netlify, Cloudflare Pages…). Nếu nút gọ
       const id = decodeURIComponent(a.getAttribute('href').slice(1));
       const go = id.match(/^(?:md-)?go-(doc|diagram|design|guide)$/);
       if (go) return DE.docs.show(go[1]);
+      const set = id.match(/^(?:md-)?go-settings(?:-(look|ai|voice|app))?$/);
+      if (set && DE.settings) return DE.settings.open(set[1]);
       const t = document.getElementById(id) || document.getElementById(id.replace(/^md-/, ''));
       if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
@@ -408,6 +478,6 @@ hosting tĩnh nào (GitHub Pages, Netlify, Cloudflare Pages…). Nếu nút gọ
     ta.dispatchEvent(new Event('input'));
     ta.focus();
     ta.setSelectionRange(text.length, text.length);
-    DE.ui.toast(DE.ai && DE.ai.active() ? 'Đã đưa ví dụ vào khung chat – bấm Gửi (Ctrl+Enter)' : 'Đã đưa ví dụ vào khung chat – thêm API key (chip “API key”) rồi bấm Gửi', 'info');
+    DE.ui.toast(DE.ai && DE.ai.active() ? 'Đã đưa ví dụ vào khung chat – bấm Gửi (Ctrl+Enter)' : 'Đã đưa ví dụ vào khung chat – thêm API key (tab ⚙ Cài đặt → Trợ lý AI) rồi bấm Gửi', 'info');
   }
 })(window.DE);
