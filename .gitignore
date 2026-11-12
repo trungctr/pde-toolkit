@@ -15,3 +15,4 @@ npm-debug.log*
 # File tạm / xuất thử
 *.tmp
 *.log
+*.txt

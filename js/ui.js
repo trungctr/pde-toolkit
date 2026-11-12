@@ -530,7 +530,7 @@
     back.innerHTML =
       `<div class="modal embed-modal skill-modal" role="dialog" aria-modal="true" aria-labelledby="skill-title">` +
       `<h3 id="skill-title">Skill prompt cho AI</h3>` +
-      `<p class="modal-msg">Đoạn prompt này dạy AI (Gemini, ChatGPT, Claude…) định dạng JSON của Diagram Editor.</p>` +
+      `<p class="modal-msg">Đoạn prompt này dạy AI (Gemini, ChatGPT, Claude…) định dạng JSON của ChillCat Studio.</p>` +
       `<ol class="skill-steps" data-for="diagram">` +
       `<li>Sao chép skill rồi dán vào ô chat của AI, viết yêu cầu của bạn ngay sau đó (vd: <i>“Vẽ quy trình đăng ký tài khoản bằng BPMN”</i>).</li>` +
       `<li>Sao chép khối <code>json</code> AI trả về.</li>` +
@@ -1316,7 +1316,6 @@
     document.body.dataset.mode = m;
     renderPalette();
     fillConnectorSelect();
-    fillTemplateSelect();
     if (!modeConnectors().some(([k]) => k === E.connector)) setConnector(modeDef().connector, false);
     renderHelp();
     scheduleProps();
@@ -1354,21 +1353,78 @@
     UI.toast(`Đã mở mẫu "${t.name}" (Ctrl+Z để quay lại)`, 'ok');
   }
 
-  function fillTemplateSelect() {
-    const ts = $('#template-select');
-    const list = Object.entries(DE.templates).filter(([, t]) => t.mode === mode);
-    const groups = new Map();
-    list.forEach(([k, t]) => {
-      const g = t.group || 'Mẫu ' + modeDef().name;
-      if (!groups.has(g)) groups.set(g, []);
-      groups.get(g).push([k, t]);
+  /**
+   * Hộp chọn diagram mẫu (nút "Mẫu" trên thanh công cụ): mẫu của mọi chế độ, chế độ đang dùng đứng trước,
+   * có ảnh xem trước và ô tìm kiếm (không phân biệt dấu). Mẫu ở chế độ khác: mở là tự chuyển chế độ.
+   */
+  function templateGallery() {
+    const plain = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+    const order = [mode, ...Object.keys(DE.MODES).filter((m) => m !== mode)];
+    const secs = new Map();
+    for (const m of order)
+      for (const [k, t] of Object.entries(DE.templates)) {
+        if (t.mode !== m) continue;
+        const g = DE.MODES[m].name + (t.group ? ' – ' + t.group : '');
+        if (!secs.has(g)) secs.set(g, []);
+        secs.get(g).push([k, t]);
+      }
+    const thumb = (t) => {
+      try {
+        const d = DE.normalizeDoc(t.build()).doc;
+        return DE.inlineSVG(d).replace(/ style="[^"]*"/, '').replace(/ width="[\d.]+" height="[\d.]+"/, ' width="100%" height="100%"');
+      } catch (_) {
+        return '';
+      }
+    };
+    const card = ([k, t]) =>
+      `<button type="button" class="dl-card dg-card" data-key="${esc(k)}" data-search="${esc(plain([t.name, t.desc, t.group, DE.MODES[t.mode].name].join(' ')))}">` +
+      `<span class="dl-thumb" aria-hidden="true">${thumb(t)}</span>` +
+      `<span class="dl-top"><span class="dl-code">${esc(DE.MODES[t.mode].name)}</span>${t.mode !== mode ? '<span class="dl-step">chuyển chế độ khi mở</span>' : ''}</span>` +
+      `<b>${esc(t.name)}</b><span class="dl-desc">${esc(t.desc || '')}</span></button>`;
+    const back = document.createElement('div');
+    back.className = 'modal-backdrop';
+    back.innerHTML =
+      `<div class="modal dl-modal" role="dialog" aria-modal="true" aria-label="Diagram mẫu">` +
+      `<div class="dl-head"><h3>Diagram mẫu</h3><input type="search" class="dl-search" placeholder="Tìm: BPMN, use case, sequence, ERD, trạng thái…" aria-label="Tìm mẫu"></div>` +
+      `<p class="modal-msg">Lưu đồ, BPMN và UML (nhóm theo các quá trình của ISO/IEC/IEEE 12207). Diagram đang vẽ được hỏi trước khi thay – mở nhầm thì Ctrl+Z để quay lại.</p>` +
+      `<div class="dl-body">` +
+      [...secs].map(([g, items]) => `<section class="dl-sec"><h4>${esc(g)}</h4><div class="dl-grid">${items.map(card).join('')}</div></section>`).join('') +
+      `<p class="dl-empty" hidden>Không có mẫu nào khớp.</p></div>` +
+      `<div class="dl-foot"><span class="dl-codes">Đang ở chế độ ${esc(modeDef().name)}</span><button type="button" class="btn" data-r="cancel">Đóng</button></div></div>`;
+    const close = () => {
+      window.removeEventListener('keydown', onKey, true);
+      back.remove();
+    };
+    const onKey = (e) => {
+      e.stopPropagation(); // phím tắt của editor không chạy khi đang mở hộp thoại
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    back.addEventListener('click', (e) => {
+      if (e.target === back || e.target.closest('[data-r="cancel"]')) return close();
+      const c = e.target.closest('.dg-card');
+      if (!c) return;
+      close();
+      loadTemplate(c.dataset.key);
     });
-    ts.innerHTML =
-      '<option value="">Mẫu diagram…</option>' +
-      [...groups]
-        .map(([g, items]) => `<optgroup label="${esc(g)}">${items.map(([k, t]) => `<option value="${k}">${esc(t.name)}</option>`).join('')}</optgroup>`)
-        .join('');
+    const search = back.querySelector('.dl-search');
+    search.addEventListener('input', () => {
+      const words = plain(search.value.trim()).split(/\s+/).filter(Boolean);
+      let shown = 0;
+      back.querySelectorAll('.dg-card').forEach((c) => {
+        c.hidden = !words.every((w) => c.dataset.search.includes(w));
+        if (!c.hidden) shown++;
+      });
+      back.querySelectorAll('.dl-sec').forEach((s) => (s.hidden = !s.querySelector('.dg-card:not([hidden])')));
+      back.querySelector('.dl-empty').hidden = shown > 0;
+    });
+    document.body.appendChild(back);
+    search.focus();
   }
+  UI.templateGallery = templateGallery;
 
   function fillConnectorSelect() {
     const cs = $('#connector-select');
@@ -1390,6 +1446,7 @@
       E.fit();
     },
     open: () => UI.openFile(),
+    templates: () => templateGallery(),
     save: () => UI.saveJSON(),
     'export-svg': () => {
       DE.download(fileBase() + '.svg', new Blob([DE.exportSVG(store.doc)], { type: 'image/svg+xml' }));
@@ -1433,15 +1490,6 @@
       b.blur();
     });
 
-    // mẫu
-    const ts = $('#template-select');
-    ts.addEventListener('change', () => {
-      const key = ts.value;
-      ts.value = '';
-      ts.blur();
-      loadTemplate(key);
-    });
-
     // kiểu đường nối mặc định
     const cs = $('#connector-select');
     cs.addEventListener('change', () => {
@@ -1464,7 +1512,7 @@
         const MAX = 8;
         const list = errors.slice(0, MAX).map((e) => '• ' + e).join('\n') + (errors.length > MAX ? `\n… và ${errors.length - MAX} lỗi khác` : '');
         UI.toast(`Không mở được "${file.name}": ${title}\n${list}`, 'error');
-        console.warn('[Diagram Editor] File không hợp lệ:', file.name, errors);
+        console.warn('[ChillCat Studio] File không hợp lệ:', file.name, errors);
       };
       if (/\.(md|markdown|mdx)$/i.test(file.name) && DE.docs) return DE.docs.openFile(file);
       // PlantUML: dịch sang diagram của app ngay trong trình duyệt (không gửi lên máy chủ)
@@ -1477,10 +1525,10 @@
         E.setSelection([]);
         E.fit();
         UI.toast(`Đã chuyển "${file.name}" (PlantUML · ${DE.plantuml.KIND_NAME[r.kind]}) thành diagram` + (r.warnings.length ? ` – bỏ qua ${r.warnings.length} chi tiết chưa hỗ trợ` : '') + '. Ctrl+Z để hoàn tác.', r.warnings.length ? 'warn' : 'ok');
-        if (r.warnings.length) console.info('[Diagram Editor] PlantUML – chi tiết bỏ qua:\n' + r.warnings.join('\n'));
+        if (r.warnings.length) console.info('[ChillCat Studio] PlantUML – chi tiết bỏ qua:\n' + r.warnings.join('\n'));
         return;
       }
-      if (!/\.json$/i.test(file.name)) return fail('chỉ nhận file .json của Diagram Editor hoặc file PlantUML .puml (file .md mở ở tab Tài liệu).', []);
+      if (!/\.json$/i.test(file.name)) return fail('chỉ nhận file .json của ChillCat Studio hoặc file PlantUML .puml (file .md mở ở tab Tài liệu).', []);
       let raw;
       try {
         raw = JSON.parse(await file.text());
@@ -2212,7 +2260,7 @@
     updateUndo();
     const d = store.doc;
     $('#st-count').textContent = `${d.nodes.length} hình · ${d.edges.length} đường nối`;
-    document.title = (d.meta?.name ? d.meta.name + ' – ' : '') + 'Diagram Editor (BPMN, UML, Flowchart)';
+    document.title = (d.meta?.name ? d.meta.name + ' – ' : '') + 'Diagram – ChillCat Studio';
     if (!$('#props').contains(document.activeElement)) scheduleProps();
     scheduleJson();
   }

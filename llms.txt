@@ -1,6 +1,19 @@
-# Diagram Editor
+# ChillCat Studio
 
-> Công cụ vẽ diagram dạng whiteboard dành cho thiết kế phần mềm, chạy hoàn toàn trên trình duyệt (HTML/CSS/JavaScript thuần, không cần build, không cần tài khoản). Hỗ trợ Flowchart, BPMN 2.0, UML 2.5 và ERD. Mọi đối tượng được quản lý bằng JSON; xuất JSON, SVG, PNG và nhúng SVG trực tiếp vào Markdown.
+> Bộ công cụ soạn tài liệu thiết kế phần mềm chạy hoàn toàn trên trình duyệt (HTML/CSS/JavaScript thuần, không cần build, không cần tài khoản): 24 mẫu tài liệu theo ISO/IEC/IEEE 12207 nối với nhau bằng mã truy vết, trình vẽ Flowchart, BPMN 2.0, UML 2.5 và ERD dạng whiteboard nhúng thẳng vào tài liệu Markdown, thiết kế trang web bằng kéo thả và chat AI. Mọi đối tượng được quản lý bằng JSON; xuất JSON, SVG, PNG, HTML.
+
+## Mẫu tài liệu thiết kế phần mềm
+
+Bộ 24 mẫu Markdown (tiếng Việt) theo ISO/IEC/IEEE 12207, 15289, 29148, 42010, IEEE 1016, 29119. Mỗi phần tử có một mã duy nhất, định nghĩa ở đúng một tài liệu, các tài liệu khác tham chiếu bằng mã: nhu cầu `StR-nn` → quy trình `BP-nn` → use case `UC-<HTC>-nn`, yêu cầu `FR-<HTC>-<MOD>-nnn` → thiết kế `SEQ-nn` / `STM-nn` → bảng dữ liệu → endpoint, tích hợp `I-nn` → bộ kiểm thử `TS-nn` → rủi ro `SEC-nn`. Ký hiệu thay thế: `PRJ` (mã dự án), `HTC` (mã hệ thống con), `MOD` (mã module), `NN` (số quy trình), `{{…}}` (chỗ cần điền). Trong app: tab Tài liệu → nút **Mẫu** (hoặc **Tài liệu mới**); app điền mã và nhớ bộ mã cho các mẫu sau.
+
+- [Hướng dẫn bộ mẫu](https://design.trungctr.com/templates/README.md): sơ đồ quan hệ, thứ tự lập, sợi truy vết mẫu, danh sách kiểm tra.
+- [Quy ước tài liệu và mã truy vết (CONV)](https://design.trungctr.com/templates/00_Quan_ly_tai_lieu/CONV_Quy_uoc_tai_lieu_va_ky_hieu.md)
+- [Ma trận truy vết (RTM-00)](https://design.trungctr.com/templates/00_Quan_ly_tai_lieu/RTM-00_Ma_tran_truy_vet.md)
+- [Phân tích nghiệp vụ (BMA-00)](https://design.trungctr.com/templates/01_Phan_tich_nghiep_vu/BMA-00_Tong_quan_nghiep_vu.md), [BPMN cấp 1](https://design.trungctr.com/templates/01_Phan_tich_nghiep_vu/BPMN-NN_Ten_quy_trinh.md)
+- [Yêu cầu các bên liên quan (StRS)](https://design.trungctr.com/templates/02_Yeu_cau/StRS-00_Yeu_cau_cac_ben_lien_quan.md), [Yêu cầu hệ thống (SyRS)](https://design.trungctr.com/templates/02_Yeu_cau/SyRS-00_Yeu_cau_he_thong.md), [Đặc tả yêu cầu phần mềm (SRS)](https://design.trungctr.com/templates/02_Yeu_cau/SRS-HTC_Ten_he_thong_con.md)
+- [Kiến trúc tổng thể (SAD)](https://design.trungctr.com/templates/03_Kien_truc/SAD-00_Kien_truc_tong_the.md), [Thiết kế chi tiết (SDD)](https://design.trungctr.com/templates/04_Thiet_ke_chi_tiet/SDD-HTC_Ten_he_thong_con.md)
+- [ERD và từ điển dữ liệu](https://design.trungctr.com/templates/05_Thiet_ke_du_lieu/ERD-HTC_CSDL_Ten_he_thong_con.md), [Đặc tả API](https://design.trungctr.com/templates/06_Giao_dien_tich_hop/API-HTC_Ten_he_thong_con.md), [Tổng quan tích hợp (ICD)](https://design.trungctr.com/templates/06_Giao_dien_tich_hop/ICD-00_Tong_quan_tich_hop.md)
+- [Kế hoạch kiểm thử (STP)](https://design.trungctr.com/templates/07_Kiem_thu/STP-00_Ke_hoach_kiem_thu.md), [Triển khai (DEP)](https://design.trungctr.com/templates/08_Trien_khai_van_hanh/DEP-00_Trien_khai_tong_the.md), [Sổ tay vận hành (OPS)](https://design.trungctr.com/templates/08_Trien_khai_van_hanh/OPS-00_So_tay_van_hanh.md), [Đánh giá rủi ro (ASM)](https://design.trungctr.com/templates/09_Danh_gia_hien_trang/ASM-00_Danh_gia_hien_trang.md)
 
 ## Chức năng chính
 

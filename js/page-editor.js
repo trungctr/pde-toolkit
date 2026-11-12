@@ -1831,7 +1831,7 @@
     if (nm && document.activeElement !== nm) nm.value = S.proj.name;
     if (active()) document.title = (S.dirty ? '● ' : '') + PG.title();
   }
-  PG.title = () => `${S.proj.name} – Thiết kế trang – Diagram Editor`;
+  PG.title = () => `${S.proj.name} – Thiết kế trang – ChillCat Studio`;
 
   const fileName = (ext) => (PK.slug(S.proj.name) || 'trang-web') + ext;
   function saveJSON() {

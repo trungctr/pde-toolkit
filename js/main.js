@@ -65,7 +65,7 @@
   function initPWA() {
     // Service worker (chỉ chạy trên http/https, không chạy khi mở bằng file://)
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
-      navigator.serviceWorker.register('sw.js').catch((e) => console.warn('[Diagram Editor] Không đăng ký được service worker:', e));
+      navigator.serviceWorker.register('sw.js').catch((e) => console.warn('[ChillCat Studio] Không đăng ký được service worker:', e));
     }
 
     // Mở file .json từ hệ điều hành (file_handlers trong manifest – app đã cài)
@@ -106,7 +106,7 @@
     window.addEventListener('appinstalled', () => {
       deferred = null;
       changed();
-      DE.ui.toast('Đã cài đặt Diagram Editor – có thể mở từ màn hình chính / menu ứng dụng', 'ok');
+      DE.ui.toast('Đã cài đặt ChillCat Studio – có thể mở từ màn hình chính / menu ứng dụng', 'ok');
     });
   }
 

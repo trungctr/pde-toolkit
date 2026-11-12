@@ -1,12 +1,12 @@
 /* =========================================================================
- * Service worker – cho phép Diagram Editor chạy offline.
+ * Service worker – cho phép ChillCat Studio chạy offline.
  * Chiến lược network-first cho mọi file cùng origin: có mạng thì luôn dùng bản
  * mới nhất (HTML, JS, CSS luôn cùng phiên bản), mất mạng thì dùng bản đã cache.
  * Thư viện tải từ CDN (Mermaid, KaTeX, highlight.js, emoji) có số phiên bản trong URL nên
  * không bao giờ đổi: cache-first trong một cache riêng, giữ qua các lần nâng cấp app.
  * Khi phát hành phiên bản mới có đổi danh sách file, tăng VERSION.
  * ========================================================================= */
-const VERSION = 'v11';
+const VERSION = 'v12';
 const CACHE = `diagram-editor-${VERSION}`;
 const CDN_CACHE = 'diagram-editor-cdn-v1';
 const CDN_ORIGIN = 'https://cdn.jsdelivr.net';
@@ -30,6 +30,7 @@ const PRECACHE = [
   'js/markdown.js',
   'js/md-rich.js',
   'js/plantuml.js',
+  'js/doc-library.js',
   'js/docs.js',
   'js/guide.js',
   'js/page-kit.js',

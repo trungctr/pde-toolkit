@@ -1,5 +1,5 @@
 /* =========================================================================
- * Diagram Editor – tiện ích chung
+ * ChillCat Studio – tiện ích chung
  * Tất cả module gắn vào namespace toàn cục window.DE (không dùng ES module
  * để có thể mở trực tiếp index.html qua file:// mà không cần web server).
  * ========================================================================= */

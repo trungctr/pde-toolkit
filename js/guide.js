@@ -4,7 +4,8 @@
  *  - Mục lục bên trái (tự sinh từ tiêu đề), tìm kiếm lọc theo mục.
  *  - Dòng "💬 Tài liệu: …" / "💬 Diagram: …" / "💬 Trang: …" có nút "Thử" – gửi ví dụ vào khung chat AI.
  *  - Link [chữ](#go-doc) / (#go-diagram) / (#go-design) chuyển sang tab tương ứng;
- *    (#go-settings-ai) / (#go-settings-voice) / (#go-settings-look) / (#go-settings-app) mở tab Cài đặt đúng nhóm.
+ *    (#go-settings-ai) / (#go-settings-voice) / (#go-settings-look) / (#go-settings-app) mở tab Cài đặt đúng nhóm;
+ *    (#go-templates) mở danh sách mẫu tài liệu (js/doc-library.js).
  * ========================================================================= */
 (function (DE) {
   'use strict';
@@ -14,13 +15,15 @@
   DE.GUIDE_MD = `
 # Hướng dẫn sử dụng
 
-**Diagram Editor** là bộ công cụ soạn **tài liệu thiết kế phần mềm**: viết tài liệu như soạn văn bản, vẽ diagram
-(Flowchart, BPMN, UML, ERD) trên whiteboard rồi nhúng vào tài liệu, **thiết kế trang web bằng kéo thả**, và nhờ **AI**
-viết giúp cả tài liệu, diagram lẫn trang web. Mọi thứ chạy ngay trên trình duyệt, không cần tài khoản, dữ liệu nằm trên máy bạn.
+**ChillCat Studio** là bộ công cụ soạn **tài liệu thiết kế phần mềm**: viết tài liệu như soạn văn bản, bắt đầu từ
+**24 mẫu tài liệu** theo ISO/IEC/IEEE 12207, vẽ diagram (Flowchart, BPMN, UML, ERD) trên whiteboard rồi nhúng vào tài liệu,
+**thiết kế trang web bằng kéo thả**, và nhờ **AI** viết giúp cả tài liệu, diagram lẫn trang web. Mọi thứ chạy ngay trên
+trình duyệt, không cần tài khoản, dữ liệu nằm trên máy bạn.
 
 ## Bắt đầu nhanh
 
-1. Mở tab **[Tài liệu](#go-doc)** và gõ nội dung như trong Word.
+1. Mở tab **[Tài liệu](#go-doc)** và gõ nội dung như trong Word – hoặc **[chọn một mẫu tài liệu](#go-templates)** (SRS, BPMN,
+   thiết kế chi tiết, ERD, API, kế hoạch kiểm thử…) để có sẵn cấu trúc, sơ đồ khung và hướng dẫn điền.
 2. Đặt con trỏ ở chỗ cần hình minh hoạ, bấm **◆ Diagram mới** → vẽ ở tab Diagram → bấm **✓ Chèn vào tài liệu**.
 3. Bấm **Lưu** (\`Ctrl+S\`) để ghi ra file \`.md\` – mở được trong VS Code, Typora, Obsidian… với diagram hiển thị sẵn.
 4. Muốn nhanh hơn? Gõ yêu cầu vào **khung chat AI** ở góc dưới bên phải, ví dụ:
@@ -159,12 +162,51 @@ và chú thích kết thúc. Nhờ vậy file \`.md\` hiển thị diagram trong
 Bấm **</> Developer** để thấy và sửa trực tiếp mã Markdown: **Mã** · **Chia đôi** (mã và trang soạn song song, cuộn đồng bộ)
 · **Trực quan**. Nút **Xem file thật** hiện đúng nội dung file sẽ được lưu.
 
+## Mẫu tài liệu
+
+Tab Tài liệu có sẵn **24 mẫu tài liệu thiết kế phần mềm** theo ISO/IEC/IEEE 12207 – từ nhu cầu của khách hàng, quy trình
+nghiệp vụ, yêu cầu, kiến trúc, thiết kế, dữ liệu, API, kiểm thử, triển khai đến đánh giá rủi ro. Bấm **Mẫu** trên thanh công cụ
+(hoặc **Tài liệu mới**), hay **[mở danh sách mẫu ngay](#go-templates)**.
+
+### Các mẫu nối với nhau thế nào?
+
+Mỗi phần tử có **một mã** và chỉ được định nghĩa ở **một** tài liệu; tài liệu khác nhắc tới nó bằng mã:
+
+| Tầng | Mã | Định nghĩa ở mẫu |
+| --- | --- | --- |
+| Nhu cầu | \`StR-01\` | StRS-00 – Yêu cầu các bên liên quan |
+| Quy trình | \`BP-11\` | BMA-00 (danh mục) và BPMN-11 (chi tiết) |
+| Use case, yêu cầu | \`UC-ORD-01\`, \`FR-ORD-CART-001\` | SRS của hệ thống con |
+| Thiết kế | \`SEQ-01\`, \`STM-01\` | SDD của hệ thống con |
+| Dữ liệu, giao diện | tên bảng, \`POST /orders\`, \`I-01\` | ERD, API của hệ thống con; ICD-00 |
+| Kiểm thử, rủi ro | \`TS-01\`, \`SEC-01\` | STP-00, ASM-00 |
+
+**RTM-00 – Ma trận truy vết** ghi lại mọi mối nối và có bảng *"sửa gì thì phải cập nhật gì"*. Mỗi mẫu có dòng
+**Tài liệu liên quan** (↑ tầng trên · ↓ tầng dưới): giữ \`Ctrl\` và bấm vào liên kết để mở mẫu đó.
+
+### Mở mẫu và điền mã
+
+1. Chọn mẫu. Ô tìm kiếm lọc theo tên, loại mã hoặc từ khoá (ví dụ "ERD", "kiểm thử", "quy trình").
+2. App hỏi **mã dự án**, **mã hệ thống con**, **mã module**, **số quy trình** – tuỳ mẫu. Các ký hiệu \`PRJ\`, \`HTC\`, \`MOD\`,
+   \`NN\` trong mẫu được thay bằng mã của bạn, tên file và ngày cũng được điền sẵn.
+3. Bộ mã được **nhớ** – mẫu mở sau dùng lại, nên các tài liệu luôn khớp mã với nhau. Muốn giữ nguyên ký hiệu, bấm **Mở nguyên mẫu**.
+4. Điền vào chỗ \`{{…}}\`, xoá các khối **TIP** (hướng dẫn điền) khi xong, rồi **Lưu** như tài liệu thường.
+
+Mục **Gợi ý bắt đầu / Gợi ý tiếp theo** ở đầu danh sách đề xuất mẫu nên làm tiếp theo thứ tự lập tài liệu:
+Quy ước → Nhu cầu → Quy trình → Yêu cầu → Kiến trúc, thiết kế → Dữ liệu, API → Kiểm thử → Triển khai → Đánh giá rủi ro.
+
+> [!TIP]
+> AI biết bộ mẫu: khi bạn nhờ viết đặc tả, thiết kế, ERD, kế hoạch kiểm thử…, AI viết theo đúng cấu trúc và hệ thống mã của mẫu.
+
+- 💬 Tài liệu: Tôi cần những tài liệu gì cho dự án web bán hàng, nên làm theo thứ tự nào?
+- 💬 Tài liệu: Điền mục "Yêu cầu chức năng" cho module giỏ hàng, đánh mã theo mẫu SRS
+
 ## Vẽ diagram
 
 ### Chế độ và ký hiệu
 
 Chọn **Flowchart**, **BPMN** hoặc **UML** (gồm cả ERD) ở đầu thanh công cụ. Thư viện bên trái chỉ hiện ký hiệu của chế độ đó;
-tab **Trợ giúp** ở bảng bên phải giải thích ý nghĩa từng ký hiệu và mũi tên. Ô **Mẫu diagram…** có sẵn nhiều mẫu để bắt đầu.
+tab **Trợ giúp** ở bảng bên phải giải thích ý nghĩa từng ký hiệu và mũi tên. Nút **Mẫu** (màu cam) mở danh sách diagram mẫu của cả ba chế độ, có ảnh xem trước và ô tìm kiếm – chọn mẫu ở chế độ khác thì app tự chuyển chế độ.
 
 ### Thao tác
 
@@ -429,6 +471,10 @@ hosting tĩnh nào (GitHub Pages, Netlify, Cloudflare Pages…). Nếu nút gọ
       const id = decodeURIComponent(a.getAttribute('href').slice(1));
       const go = id.match(/^(?:md-)?go-(doc|diagram|design|guide)$/);
       if (go) return DE.docs.show(go[1]);
+      if (/^(?:md-)?go-templates$/.test(id) && DE.docLib) {
+        DE.docs.show('doc');
+        return DE.docLib.gallery();
+      }
       const set = id.match(/^(?:md-)?go-settings(?:-(look|ai|voice|app))?$/);
       if (set && DE.settings) return DE.settings.open(set[1]);
       const t = document.getElementById(id) || document.getElementById(id.replace(/^md-/, ''));

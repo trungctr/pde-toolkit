@@ -378,7 +378,7 @@
       if (++rv.fails >= 2) rv.broken = true; // hỏng 2 lần liên tiếp → thôi dùng trong phiên này
       if (rv.broken && !rv.warned) {
         rv.warned = true;
-        console.warn('[Diagram Editor] ResponsiveVoice không đọc được – chuyển sang giọng của máy.');
+        console.warn('[ChillCat Studio] ResponsiveVoice không đọc được – chuyển sang giọng của máy.');
       }
       return speakSys(text, V.voicesFor(lang)[0]);
     }

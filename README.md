@@ -1,9 +1,10 @@
-# Diagram Editor – Whiteboard cho thiết kế phần mềm
+# ChillCat Studio – Soạn tài liệu thiết kế phần mềm
 
-Trình vẽ diagram dạng whiteboard chạy hoàn toàn trên trình duyệt: **Flowchart, BPMN 2.0, UML 2.5 và ERD**.
-HTML + CSS + JavaScript thuần, không cần build, không phụ thuộc thư viện ngoài. Mọi đối tượng được quản lý
-bằng **JSON**, và có **Chat AI** – gõ hoặc **nói** – để mô tả bằng lời rồi để AI vẽ giúp. Kèm theo là tab soạn
-**tài liệu Markdown** (nhúng diagram) và tab **thiết kế trang web bằng kéo thả** (xuất file HTML).
+Bộ công cụ soạn **tài liệu thiết kế phần mềm** chạy hoàn toàn trên trình duyệt: **24 mẫu tài liệu** theo
+ISO/IEC/IEEE 12207 nối với nhau bằng mã truy vết, trình vẽ diagram dạng whiteboard (**Flowchart, BPMN 2.0, UML 2.5
+và ERD**) nhúng thẳng vào tài liệu **Markdown**, tab **thiết kế trang web bằng kéo thả** (xuất file HTML) và
+**Chat AI** – gõ hoặc **nói** – để AI viết tài liệu, vẽ diagram, dựng trang. HTML + CSS + JavaScript thuần, không cần
+build, không phụ thuộc thư viện ngoài; mọi đối tượng được quản lý bằng **JSON**.
 
 **Dùng ngay:** <https://design.trungctr.com/> (cài được như ứng dụng, chạy cả khi offline).
 
@@ -11,6 +12,7 @@ bằng **JSON**, và có **Chat AI** – gõ hoặc **nói** – để mô tả 
 
 - [Chạy trên máy](#chạy-trên-máy)
 - [Tính năng](#tính-năng)
+- [Mẫu tài liệu](#mẫu-tài-liệu)
 - [Tài liệu Markdown](#tài-liệu-markdown)
 - [Thiết kế trang](#thiết-kế-trang)
 - [Chat AI](#chat-ai)
@@ -24,7 +26,8 @@ bằng **JSON**, và có **Chat AI** – gõ hoặc **nói** – để mô tả 
 
 Mở trực tiếp `index.html` bằng Chrome / Edge / Firefox (hỗ trợ cả `file://`). Hoặc chạy qua web server tĩnh
 bất kỳ, ví dụ `npx serve .` hay `python -m http.server`. Cần chạy qua `http(s)://` thì PWA (cài đặt, offline)
-mới hoạt động.
+mới hoạt động. Khi mở bằng `file://`, trình duyệt không cho đọc file cục bộ nên mẫu tài liệu được tải từ bản
+online (cần mạng).
 
 ## Tính năng
 
@@ -37,7 +40,8 @@ mới hoạt động.
 - **99 ký hiệu chuẩn** và **27 kiểu đường nối** (Sequence / Message Flow, Generalization, Realization,
   Dependency, Aggregation, Composition, Include / Extend, các loại message, crow's foot…). Định tuyến vuông góc,
   thẳng hoặc cong; kéo đầu mút để nối lại sang hình khác.
-- **Mẫu diagram**: Flowchart, BPMN, và 13 mẫu UML nhóm theo các quá trình kỹ thuật của ISO/IEC/IEEE 12207
+- **Mẫu diagram** (nút **Mẫu** màu cam trên thanh công cụ – hộp chọn có ảnh xem trước, tìm kiếm, mẫu của cả ba chế độ,
+  chọn mẫu chế độ khác thì tự chuyển chế độ): Flowchart, BPMN, và 13 mẫu UML nhóm theo các quá trình kỹ thuật của ISO/IEC/IEEE 12207
   (Activity nghiệp vụ, Use Case, Domain model, Package, Component, Class, Sequence, Communication, State
   Machine, ERD, Deployment, Activity kiểm thử CI, State Machine yêu cầu thay đổi). Tiêu chuẩn không bắt buộc
   loại diagram – cách ánh xạ là thông lệ phổ biến.
@@ -98,6 +102,35 @@ Lối tắt vẫn còn: nút cài đặt ở góc khung chat (chấm xanh = đã
 hình mở thẳng nhóm Trợ lý AI; chuột phải vào 🎤 hoặc lệnh giọng nói “cài đặt giọng nói” mở nhóm Giọng nói. Gửi chat khi chưa có
 key thì hộp thoại cài đặt AI mở ngay tại chỗ để gửi tiếp được luôn. Mã nguồn: `js/settings.js` (khung trang, giao diện,
 ứng dụng); form AI là `DE.ui.aiForm(host)` trong `js/ui.js`, form giọng nói là `DE.voice.settingsForm(host)` trong `js/voice.js`.
+
+## Mẫu tài liệu
+
+Thư mục [`templates/`](templates/README.md) chứa **24 mẫu tài liệu thiết kế phần mềm** theo ISO/IEC/IEEE 12207,
+mỗi mẫu có khối thông tin đầu, hướng dẫn điền (`> [!TIP]`), bảng ví dụ và sơ đồ khung là diagram nhúng của app:
+
+| Thư mục | Mẫu |
+| --- | --- |
+| `00_Quan_ly_tai_lieu` | Quy ước và mã (CONV), sổ đăng ký (DOC-REG), thuật ngữ, ma trận truy vết (RTM-00), nhật ký |
+| `01_Phan_tich_nghiep_vu` | Phân tích nghiệp vụ (BMA-00), BPMN cấp 0, BPMN cấp 1 (`BPMN-NN`, nhân bản cho mỗi quy trình) |
+| `02_Yeu_cau` | StRS-00, SyRS-00, SRS (`SRS-HTC`, nhân bản cho mỗi hệ thống con) |
+| `03_Kien_truc` … `06_Giao_dien_tich_hop` | SAD-00, ADR, SDD, DBD-00, ERD, ICD-00, API |
+| `07_Kiem_thu` … `09_Danh_gia_hien_trang` | Kế hoạch kiểm thử, triển khai, hạ tầng, sổ tay vận hành, đánh giá rủi ro |
+
+**Liên kết giữa các mẫu:** mỗi phần tử có một mã (`StR-01`, `BP-11`, `UC-ORD-01`, `FR-ORD-CART-001`, `SEQ-01`,
+`TS-01`, `SEC-01`…), được định nghĩa ở đúng một tài liệu và được tài liệu khác tham chiếu bằng mã. RTM-00 ghi mọi mối
+nối và bảng "sửa gì thì cập nhật gì"; mỗi mẫu có dòng *Tài liệu liên quan* (↑ tầng trên · ↓ tầng dưới).
+
+**Trong app** (`js/doc-library.js`):
+
+- Tab Tài liệu → nút **Mẫu**, hoặc **Tài liệu mới** → hộp chọn mẫu có tìm kiếm và mục **Gợi ý bắt đầu / tiếp theo**
+  (mẫu chưa mở, theo thứ tự lập tài liệu).
+- Mở mẫu: app hỏi mã dự án (`PRJ`), hệ thống con (`HTC`), module (`MOD`), số quy trình (`NN`) tuỳ loại mẫu, thay vào
+  nội dung, tên file, liên kết và ngày; khối `[!TIP]` giữ nguyên. Bộ mã được nhớ trong `localStorage`
+  (`diagram-editor:doc-lib:v1`) nên các tài liệu mở sau khớp mã với nhau. **Mở nguyên mẫu** giữ các ký hiệu.
+- `Ctrl` + bấm liên kết `.md` trong tài liệu mở từ mẫu → mở mẫu đích (nhận cả tên file đã điền mã).
+- Chat AI nhận danh mục mẫu (mục, mã định nghĩa) nên viết đúng cấu trúc và gợi ý mẫu phù hợp.
+- Mẫu tải bằng `fetch` từ `templates/` (cùng origin) và được service worker cache để dùng offline; mở bằng
+  `file://` thì tải từ `https://design.trungctr.com/templates/`.
 
 ## Tài liệu Markdown
 
@@ -631,6 +664,7 @@ js/export.js           xuất SVG / PNG, nhúng Markdown
 js/markdown.js         render Markdown → HTML (CommonMark + GFM + công thức, Mermaid, chú thích, emoji, [TOC], front matter) + làm sạch HTML
 js/md-rich.js          vẽ Mermaid / KaTeX / tô màu code / emoji (tải thư viện từ CDN khi cần, có SRI), hộp thoại sửa có xem trước
 js/plantuml.js         dịch PlantUML và Mermaid → JSON diagram (lưu đồ, sequence, use case, class, activity, state, component, ER) + tự dàn trang, chạy offline
+js/doc-library.js      thư viện mẫu tài liệu: danh mục, hộp chọn mẫu, điền mã dự án, mở mẫu liên quan, danh mục cho AI
 js/docs.js             tab Tài liệu: soạn / xem .md, mở / lưu file, nhúng & sửa diagram (phiên nhúng), áp dụng tài liệu từ AI
 js/guide.js            tab Hướng dẫn: nội dung hướng dẫn sử dụng (Markdown), mục lục, tìm kiếm, nút “Thử” ví dụ prompt
 js/page-kit.js         thiết kế trang – lõi: danh mục thành phần & thuộc tính, chuẩn hoá / lọc JSON, sinh HTML + CSS, file HTML xuất ra, skill AI
@@ -642,7 +676,9 @@ js/main.js             khởi động, tự lưu, PWA
 sw.js                  service worker (offline)
 manifest.webmanifest   cấu hình PWA
 icons/                 icon SVG gốc + PNG (192 / 512, maskable, apple-touch-icon)
+templates/             24 mẫu tài liệu thiết kế phần mềm (Markdown + diagram nhúng), README hướng dẫn bộ mẫu
 llms.txt, robots.txt, sitemap.xml, og-image.png   SEO / AI SEO
+.nojekyll              tắt Jekyll trên GitHub Pages để file .md trong templates/ được phục vụ nguyên bản
 ```
 
 ### Thêm một hình mới
@@ -666,6 +702,8 @@ Trang chạy trên **GitHub Pages** (Deploy from a branch: `main`, thư mục `/
 `design.trungctr.com`:
 
 - File `CNAME` trong repo lưu custom domain của GitHub Pages – **không xoá**.
+- File `.nojekyll` (rỗng) – **không xoá**: thiếu nó, GitHub Pages chạy Jekyll, đổi các file `.md` thành `.html` và
+  app không tải được mẫu tài liệu.
 - DNS (Cloudflare): bản ghi `CNAME design → trungctr.github.io`, chế độ **DNS only**; bật **Enforce HTTPS**
   trong Settings → Pages.
 - Khi phát hành bản mới có thêm / bớt file: cập nhật `PRECACHE` và tăng `VERSION` trong `sw.js`; cập nhật

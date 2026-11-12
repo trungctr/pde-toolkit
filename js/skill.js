@@ -1,7 +1,7 @@
 /* =========================================================================
  * "Skill prompt" cho AI bên ngoài (Gemini, ChatGPT, Claude…).
  * Người dùng dán đoạn này vào ô chat trước yêu cầu của họ, AI sẽ hiểu định dạng
- * JSON của Diagram Editor và trả về diagram hợp lệ.
+ * JSON của ChillCat Studio và trả về diagram hợp lệ.
  * Nội dung được SINH TỪ THƯ VIỆN HÌNH (DE.shapes, DE.connectors, DE.HELP) nên luôn
  * khớp với phiên bản app đang chạy.
  * ========================================================================= */
@@ -149,9 +149,9 @@
     const modes = (opts.modes && opts.modes.length ? opts.modes : Object.keys(DE.MODES)).filter((m) => DE.MODES[m]);
     const modeNames = modes.map((m) => DE.MODES[m].name).join(', ');
     const L = [];
-    L.push('# SKILL: Tạo diagram JSON cho "Diagram Editor"');
+    L.push('# SKILL: Tạo diagram JSON cho "ChillCat Studio"');
     L.push('');
-    L.push(`Bạn là trợ lý tạo diagram cho ứng dụng **Diagram Editor** (${APP_URL}) – công cụ vẽ ${modeNames}. Khi người dùng mô tả một quy trình, hệ thống hoặc thiết kế, hãy tạo **một tài liệu JSON** đúng định dạng dưới đây. Người dùng sẽ dán JSON vào tab **JSON** của app rồi bấm **Áp dụng** (hoặc lưu thành file \`.json\` rồi bấm **Mở**).`);
+    L.push(`Bạn là trợ lý tạo diagram cho ứng dụng **ChillCat Studio** (${APP_URL}) – công cụ vẽ ${modeNames}. Khi người dùng mô tả một quy trình, hệ thống hoặc thiết kế, hãy tạo **một tài liệu JSON** đúng định dạng dưới đây. Người dùng sẽ dán JSON vào tab **JSON** của app rồi bấm **Áp dụng** (hoặc lưu thành file \`.json\` rồi bấm **Mở**).`);
     L.push('');
     L.push('## Cách trả lời');
     L.push('1. Trả về đúng **một** khối ```json … ``` chứa TOÀN BỘ tài liệu. JSON phải hợp lệ tuyệt đối: không comment, không dấu phẩy thừa, chuỗi dùng nháy kép, xuống dòng trong chuỗi viết là `\\n`.');
@@ -274,9 +274,9 @@
    */
   DE.buildDocSkill = function (opts = {}) {
     const L = [];
-    L.push('# SKILL: Soạn tài liệu Markdown cho "Diagram Editor"');
+    L.push('# SKILL: Soạn tài liệu Markdown cho "ChillCat Studio"');
     L.push('');
-    L.push(`Ngoài vẽ diagram, **Diagram Editor** (${APP_URL}) có tab **Tài liệu** để soạn tài liệu Markdown (đặc tả, thiết kế, hướng dẫn, biên bản…) và nhúng diagram vào tài liệu. Người dùng thường không biết Markdown – họ xem tài liệu ở dạng đã định dạng.`);
+    L.push(`Ngoài vẽ diagram, **ChillCat Studio** (${APP_URL}) có tab **Tài liệu** để soạn tài liệu Markdown (đặc tả, thiết kế, hướng dẫn, biên bản…) và nhúng diagram vào tài liệu. Người dùng thường không biết Markdown – họ xem tài liệu ở dạng đã định dạng.`);
     L.push('');
     L.push('## Cách trả lời khi viết hoặc sửa tài liệu');
     L.push('1. Trả về **TOÀN BỘ** tài liệu sau khi viết/sửa trong đúng **một** khối bọc bằng BỐN dấu backtick: dòng đầu ````` ````markdown `````, dòng cuối ````` ```` `````. (Bốn dấu để các khối ``` bên trong không làm đóng khối ngoài.) App sẽ thay nội dung tài liệu bằng khối này – người dùng có nút Hoàn tác.');
@@ -297,6 +297,10 @@
     L.push('- Đặc tả yêu cầu: Mục đích · Phạm vi · Tác nhân · Use case (diagram) · Luồng chính / luồng phụ · Quy tắc nghiệp vụ (bảng) · Yêu cầu phi chức năng.');
     L.push('- Thiết kế: Tổng quan kiến trúc (Component diagram) · Mô hình dữ liệu (ERD) · Luồng xử lý (Sequence) · API (bảng) · Rủi ro.');
     L.push('- Hướng dẫn / quy trình vận hành: các bước đánh số, ghi chú `> [!WARNING]` cho bước nguy hiểm, diagram quy trình (BPMN / Flowchart).');
+    if (DE.docLib) {
+      L.push('');
+      L.push(DE.docLib.skillText());
+    }
     L.push('');
     L.push('## Chọn kiểu trả lời theo tab người dùng đang mở (ghi ở đầu mỗi tin nhắn)');
     L.push('- **Tab Tài liệu**: viết / sửa / bổ sung tài liệu (kể cả "vẽ thêm sơ đồ … vào tài liệu") → khối ````markdown đầy đủ.');
@@ -308,8 +312,9 @@
     L.push('- 5 tab trên cùng: Tài liệu (Alt+1), Diagram (Alt+2), Thiết kế trang (Alt+3), Hướng dẫn (Alt+4), Cài đặt (Alt+5, góc phải). Khung chat AI có ở mọi tab trừ Cài đặt.');
     L.push('- Cài đặt (tab ⚙): Giao diện (sáng / tối / theo hệ thống), Trợ lý AI (nhà cung cấp, API key, mô hình, effort, thinking), Giọng nói (micro, bộ nhận dạng, giọng đọc), Ứng dụng & dữ liệu (cài như ứng dụng, offline, dung lượng đã lưu).');
     L.push('- Thiết kế trang: kéo thành phần (khối trang, hàng, cột, nút, ảnh, menu, bảng, biểu mẫu, mẫu dựng sẵn) từ thư viện bên trái vào trang; nhấn đúp để sửa chữ; bảng Thuộc tính bên phải chia nhóm (Định dạng, Loại nút, Hiệu ứng khi di chuột qua / khi bấm…); tab Lớp để sắp xếp; Máy tính / Máy tính bảng / Điện thoại để xem từng cỡ màn hình; "▶ Xem thử" để chạy thử; tải HTML (mọi trang trong một file) hoặc JSON.');
+    L.push('- Mẫu tài liệu: tab Tài liệu → nút "Mẫu" (hoặc "Tài liệu mới") → chọn mẫu; app hỏi mã dự án / hệ thống con / module / số quy trình (nhớ cho lần sau) rồi thay vào mẫu; Ctrl + bấm liên kết trong tài liệu mở từ mẫu để mở mẫu liên quan; hộp chọn mẫu có ô tìm kiếm và mục "Gợi ý tiếp theo".');
     L.push('- Tài liệu: gõ trực tiếp như Word, thanh công cụ định dạng; "◆ Diagram mới" mở tab Diagram để vẽ rồi "✓ Chèn vào tài liệu"; rê chuột lên diagram → "✎ Sửa" (hoặc nhấn đúp). Mở / lưu file .md bằng Ctrl+O / Ctrl+S hoặc kéo thả file vào cửa sổ. File .md lưu diagram dạng SVG + JSON. Nút "</> Developer" hiện mã Markdown.');
-    L.push('- Diagram: chọn chế độ Flowchart / BPMN / UML; kéo hình từ thư viện bên trái; rê chuột lên hình rồi kéo từ chấm xanh để nối; nhấn đúp để sửa chữ; bảng Thuộc tính bên phải; tab JSON để sửa dữ liệu; tải JSON / SVG / PNG.');
+    L.push('- Diagram: nút "Mẫu" (màu cam) mở diagram mẫu của cả ba chế độ có ảnh xem trước; chọn chế độ Flowchart / BPMN / UML; kéo hình từ thư viện bên trái; rê chuột lên hình rồi kéo từ chấm xanh để nối; nhấn đúp để sửa chữ; bảng Thuộc tính bên phải; tab JSON để sửa dữ liệu; tải JSON / SVG / PNG.');
     L.push('- Chat AI: chọn nhà cung cấp ở tab Cài đặt → Trợ lý AI (hoặc nút cài đặt ở góc khung chat; có gói miễn phí: Google Gemini, OpenRouter, Groq…); đổi mô hình nhanh bằng dropdown trên khung chat; Ctrl+Enter để gửi, Ctrl+M để nói.');
     L.push('');
     L.push('## Ví dụ trả lời (tab Tài liệu)');

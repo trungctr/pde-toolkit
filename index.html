@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Diagram Editor – Vẽ BPMN, UML, Flowchart online dạng whiteboard</title>
+  <title>ChillCat Studio – Soạn tài liệu thiết kế phần mềm, BPMN, UML, ERD</title>
 
   <!-- ============================== SEO ============================== -->
-  <meta name="description" content="Công cụ vẽ diagram chuyên dụng cho thiết kế phần mềm dạng whiteboard, chạy ngay trên trình duyệt: BPMN 2.0, UML 2.5 (Use Case, Activity, Class, Sequence, State, Component, Deployment), Flowchart và ERD. Dữ liệu lưu dạng JSON, xuất SVG/PNG và nhúng SVG trực tiếp vào Markdown.">
-  <meta name="keywords" content="diagram editor, vẽ diagram, BPMN, BPMN 2.0, UML, UML 2.5, flowchart, lưu đồ, ERD, sequence diagram, class diagram, use case diagram, activity diagram, state machine, component diagram, deployment diagram, whiteboard, thiết kế phần mềm, ISO/IEC/IEEE 12207, JSON, SVG, Markdown, mermaid alternative">
-  <meta name="application-name" content="Diagram Editor">
+  <meta name="description" content="Soạn tài liệu thiết kế phần mềm ngay trên trình duyệt: 24 mẫu SRS, SDD, ERD, API, BPMN theo ISO/IEC/IEEE 12207 nối với nhau bằng mã truy vết, vẽ BPMN, UML, ERD nhúng vào Markdown, thiết kế trang web và chat AI.">
+  <meta name="keywords" content="ChillCat Studio, tài liệu thiết kế phần mềm, mẫu tài liệu phần mềm, mẫu SRS, đặc tả yêu cầu phần mềm, SDD, thiết kế chi tiết, ERD, đặc tả API, ma trận truy vết, RTM, kế hoạch kiểm thử, ISO/IEC/IEEE 12207, ISO/IEC/IEEE 29148, IEEE 1016, BPMN, BPMN 2.0, UML, UML 2.5, use case, sequence diagram, class diagram, flowchart, vẽ diagram, Markdown, chat AI">
+  <meta name="application-name" content="ChillCat Studio">
   <meta name="robots" content="index, follow, max-image-preview:large">
-  <meta name="generator" content="Diagram Editor (HTML/CSS/JavaScript thuần)">
+  <meta name="generator" content="ChillCat Studio (HTML/CSS/JavaScript thuần)">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff">
@@ -21,18 +21,18 @@
   <meta property="og:image" content="https://design.trungctr.com/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-  <meta property="og:image:alt" content="Giao diện Diagram Editor đang vẽ một quy trình BPMN">
+  <meta property="og:image:alt" content="ChillCat Studio – hộp chọn 24 mẫu tài liệu thiết kế phần mềm theo ISO/IEC/IEEE 12207">
   <meta name="twitter:image" content="https://design.trungctr.com/og-image.png">
 
   <!-- Open Graph / mạng xã hội -->
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Diagram Editor">
+  <meta property="og:site_name" content="ChillCat Studio">
   <meta property="og:locale" content="vi_VN">
-  <meta property="og:title" content="Diagram Editor – Vẽ BPMN, UML, Flowchart online dạng whiteboard">
-  <meta property="og:description" content="Vẽ BPMN 2.0, UML 2.5, Flowchart và ERD trên whiteboard. Dữ liệu JSON, xuất SVG/PNG, nhúng SVG vào Markdown. Mẫu UML theo các quá trình của ISO/IEC/IEEE 12207.">
+  <meta property="og:title" content="ChillCat Studio – Soạn tài liệu thiết kế phần mềm, BPMN, UML, ERD">
+  <meta property="og:description" content="24 mẫu tài liệu thiết kế phần mềm theo ISO/IEC/IEEE 12207 (SRS, SDD, ERD, API, BPMN, kiểm thử, rủi ro) nối bằng mã truy vết. Vẽ BPMN, UML, ERD nhúng thẳng vào Markdown, thiết kế trang web, chat AI.">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Diagram Editor – BPMN, UML, Flowchart whiteboard">
-  <meta name="twitter:description" content="Vẽ BPMN 2.0, UML 2.5, Flowchart và ERD ngay trên trình duyệt. JSON, SVG, PNG và nhúng SVG vào Markdown.">
+  <meta name="twitter:title" content="ChillCat Studio – Tài liệu thiết kế phần mềm, BPMN, UML, ERD">
+  <meta name="twitter:description" content="Mẫu SRS, SDD, ERD, API theo ISO/IEC/IEEE 12207, vẽ BPMN, UML, ERD nhúng vào Markdown, chat AI – chạy ngay trên trình duyệt.">
 
   <!-- AI / LLM: mô tả có cấu trúc cho máy đọc -->
   <link rel="alternate" type="text/plain" href="https://design.trungctr.com/llms.txt" title="LLM-friendly description">
@@ -41,20 +41,23 @@
   {
     "@context": "https://schema.org",
     "@type": "WebApplication",
-    "name": "Diagram Editor",
+    "name": "ChillCat Studio",
     "url": "https://design.trungctr.com/",
     "image": "https://design.trungctr.com/og-image.png",
     "screenshot": "https://design.trungctr.com/og-image.png",
     "codeRepository": "https://github.com/trungctr/pde-toolkit",
-    "alternateName": ["Trình vẽ diagram BPMN UML Flowchart", "Whiteboard diagram editor"],
-    "description": "Công cụ vẽ diagram dạng whiteboard dành cho thiết kế phần mềm: BPMN 2.0, UML 2.5, Flowchart và ERD. Đối tượng được quản lý bằng JSON; xuất SVG, PNG; nhúng SVG trực tiếp vào Markdown.",
-    "applicationCategory": "DesignApplication",
-    "applicationSubCategory": "Diagramming / Software modeling",
+    "alternateName": ["Trình soạn tài liệu thiết kế phần mềm", "Mẫu tài liệu SRS, SDD, ERD, API", "Diagram Editor"],
+    "description": "Bộ công cụ soạn tài liệu thiết kế phần mềm chạy trên trình duyệt: 24 mẫu tài liệu theo ISO/IEC/IEEE 12207 (StRS, SRS, SDD, ERD, API, BPMN, kế hoạch kiểm thử, triển khai, đánh giá rủi ro) nối với nhau bằng mã truy vết; vẽ BPMN 2.0, UML 2.5, Flowchart, ERD trên whiteboard và nhúng vào Markdown; thiết kế trang web bằng kéo thả; chat AI.",
+    "applicationCategory": "DeveloperApplication",
+    "applicationSubCategory": "Software design documentation / Diagramming",
     "operatingSystem": "Mọi hệ điều hành có trình duyệt hiện đại (Chrome, Edge, Firefox, Safari)",
     "browserRequirements": "Requires JavaScript. Requires HTML5 (SVG, Canvas).",
     "inLanguage": "vi",
     "isAccessibleForFree": true,
     "featureList": [
+      "24 mẫu tài liệu thiết kế phần mềm theo ISO/IEC/IEEE 12207: quy ước, ma trận truy vết, phân tích nghiệp vụ, BPMN, StRS, SyRS, SRS, SAD, ADR, SDD, ERD, API, ICD, kế hoạch kiểm thử, triển khai, vận hành, đánh giá rủi ro",
+      "Mã truy vết xuyên suốt: nhu cầu → quy trình → use case, yêu cầu → thiết kế → dữ liệu → API → kiểm thử → rủi ro",
+      "Mở mẫu tự điền mã dự án, hệ thống con, module, số quy trình; nhớ bộ mã và gợi ý mẫu nên làm tiếp",
       "3 chế độ: Flowchart, BPMN 2.0, UML 2.5 (kèm ERD)",
       "99 ký hiệu chuẩn và 27 kiểu đường nối (sequence flow, message flow, generalization, composition, crow's foot…)",
       "Mẫu UML theo các quá trình kỹ thuật của ISO/IEC/IEEE 12207",
@@ -69,7 +72,7 @@
       "Thiết kế trang web bằng kéo thả: hàng, cột, nút bấm, menu, bảng, biểu mẫu; xem theo máy tính / máy tính bảng / điện thoại; xuất HTML",
       "Chạy offline, không cần cài đặt, không cần tài khoản"
     ],
-    "keywords": "BPMN, UML, flowchart, ERD, diagram, whiteboard, ISO/IEC/IEEE 12207, JSON, SVG, Markdown",
+    "keywords": "tài liệu thiết kế phần mềm, mẫu SRS, SDD, ERD, API, ma trận truy vết, ISO/IEC/IEEE 12207, BPMN, UML, flowchart, Markdown, chat AI",
     "softwareRequirements": "Trình duyệt web hiện đại",
     "fileFormat": ["application/json", "text/markdown", "image/svg+xml", "image/png"]
   }
@@ -82,7 +85,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Diagrams">
+  <meta name="apple-mobile-web-app-title" content="ChillCat">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
   <!-- Áp dụng theme sớm để không bị nháy trắng khi tải -->
@@ -99,10 +102,12 @@
 <body>
   <noscript>
     <main class="noscript">
-      <h1>Diagram Editor – vẽ BPMN, UML, Flowchart dạng whiteboard</h1>
+      <h1>ChillCat Studio – soạn tài liệu thiết kế phần mềm, BPMN, UML, ERD</h1>
       <p>Ứng dụng cần JavaScript để chạy. Hãy bật JavaScript trong trình duyệt.</p>
-      <p>Diagram Editor là công cụ vẽ diagram chuyên dụng cho thiết kế phần mềm, chạy hoàn toàn trên trình duyệt, không cần cài đặt hay tài khoản:</p>
+      <p>ChillCat Studio là bộ công cụ soạn tài liệu thiết kế phần mềm, chạy hoàn toàn trên trình duyệt, không cần cài đặt hay tài khoản:</p>
       <ul>
+        <li><strong>24 mẫu tài liệu</strong> theo ISO/IEC/IEEE 12207 – đặc tả yêu cầu (StRS, SyRS, SRS), quy trình BPMN, kiến trúc (SAD, ADR), thiết kế chi tiết (SDD), ERD, API, kế hoạch kiểm thử, triển khai, đánh giá rủi ro – nối với nhau bằng mã truy vết và <a href="templates/00_Quan_ly_tai_lieu/RTM-00_Ma_tran_truy_vet.md">ma trận truy vết</a>. Xem <a href="templates/README.md">hướng dẫn bộ mẫu</a>.</li>
+        <li>Soạn tài liệu <strong>Markdown</strong> như Word, nhúng diagram và sửa lại bất cứ lúc nào.</li>
         <li><strong>Flowchart</strong> theo ISO 5807: terminator, process, decision, data, document, database…</li>
         <li><strong>BPMN 2.0</strong>: event, task, gateway (XOR, AND, OR), pool, lane, sequence flow, message flow.</li>
         <li><strong>UML 2.5</strong>: use case, activity, state machine, class, package, component, deployment, sequence, communication; kèm <strong>ERD</strong>.</li>
@@ -140,7 +145,7 @@
 
     <!-- ============================== TOOLBAR ============================== -->
     <header id="toolbar">
-      <div class="brand"><span class="logo">◆</span> Diagram<b>Editor</b></div>
+      <div class="brand"><span class="logo">◆</span> ChillCat<b>Studio</b></div>
 
       <div id="mode-switch" class="mode-switch" role="tablist" title="Chế độ: mỗi chế độ chỉ hiển thị các ký hiệu của loại diagram đó">
         <button data-mode="flowchart">Flowchart</button>
@@ -151,7 +156,7 @@
       <div class="tb-group">
         <button data-action="new" data-icon="new" title="Tài liệu mới"></button>
         <button data-action="open" data-icon="open" title="Mở file diagram .json (Ctrl+O)"></button>
-        <select id="template-select" title="Mở diagram mẫu"></select>
+        <button data-action="templates" class="text-btn tpl-btn" data-tpl-btn="diagram" title="Diagram mẫu: lưu đồ, BPMN, UML (use case, class, sequence, state, ERD, deployment…) – có ảnh xem trước"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Mẫu<span class="tpl-new">Mới</span></button>
       </div>
 
       <div class="tb-group">
@@ -252,11 +257,14 @@
     <section id="docview" class="docview" hidden role="tabpanel" aria-label="Tài liệu Markdown">
       <div class="doc-toolbar">
         <div class="tb-group">
-          <button data-doc="new" data-icon="new" title="Tài liệu Markdown mới"></button>
+          <button data-doc="new" data-icon="new" title="Tài liệu mới – chọn tài liệu trống hoặc một mẫu tài liệu"></button>
           <button data-doc="open" data-icon="open" title="Mở file .md (Ctrl+O)"></button>
           <button data-doc="save" data-icon="save" title="Lưu (Ctrl+S) – ghi thẳng vào file đang mở nếu trình duyệt hỗ trợ, không thì tải xuống · Ctrl+Shift+S: lưu thành file khác"></button>
           <input id="doc-name" class="doc-name" type="text" spellcheck="false" autocomplete="off" title="Tên file khi lưu / tải xuống" aria-label="Tên file">
           <span id="doc-dirty" class="doc-dirty" title="Có thay đổi chưa lưu ra file" hidden>●</span>
+        </div>
+        <div class="tb-group">
+          <button data-doc="templates" class="text-btn tpl-btn" data-tpl-btn="doc" title="Mẫu tài liệu thiết kế phần mềm (ISO/IEC/IEEE 12207): SRS, BPMN, SDD, ERD, API, kế hoạch kiểm thử, triển khai, đánh giá rủi ro…"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="13" height="17" rx="2"/><path d="M8 8h5M8 12h5M8 16h3M20 7v13a1 1 0 01-1 1H8"/></svg>Mẫu<span class="tpl-new">Mới</span></button>
         </div>
         <div class="tb-group doc-fmt" role="group" aria-label="Định dạng">
           <button data-fmt="h1" title="Tiêu đề 1">H1</button>
@@ -503,6 +511,7 @@
   <script src="js/markdown.js"></script>
   <script src="js/md-rich.js"></script>
   <script src="js/plantuml.js"></script>
+  <script src="js/doc-library.js"></script>
   <script src="js/docs.js"></script>
   <script src="js/guide.js"></script>
   <script src="js/page-kit.js"></script>

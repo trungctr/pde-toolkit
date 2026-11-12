@@ -1268,7 +1268,7 @@ d.addEventListener('submit',function(e){var f=e.target,k=f.getAttribute('data-su
     const user = proj.script && proj.script.trim() ? `<script>\n${safeScript(proj.script)}\n</script>\n` : '';
     return (
       `<!doctype html>\n<html lang="vi">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n` +
-      `<title>${esc(PK.pageTitle(proj, proj.pages[0]))}</title>\n<meta name="generator" content="Diagram Editor – Thiết kế trang">\n${fontLink}` +
+      `<title>${esc(PK.pageTitle(proj, proj.pages[0]))}</title>\n<meta name="generator" content="ChillCat Studio – Thiết kế trang">\n${fontLink}` +
       `<style>\n${css.join('\n')}\n</style>\n</head>\n<body>\n${pages.join('\n')}\n${start}<script>\n${RUNTIME}\n</script>\n${user}</body>\n</html>\n`
     );
   };
@@ -1539,7 +1539,7 @@ d.addEventListener('submit',function(e){var f=e.target,k=f.getAttribute('data-su
   /** Skill dạy AI định dạng JSON của tab Thiết kế trang. opts.proj: kèm dự án hiện tại */
   DE.buildPageSkill = function (opts = {}) {
     const L = [];
-    L.push('# SKILL: Thiết kế trang web (tab "Thiết kế trang" của Diagram Editor)');
+    L.push('# SKILL: Thiết kế trang web (tab "Thiết kế trang" của ChillCat Studio)');
     L.push('');
     L.push('Tab **Thiết kế trang** dựng trang web bằng kéo thả cho người không biết code. Dữ liệu là một dự án JSON gồm nhiều trang; mỗi trang là cây thành phần (khối, hàng, cột, chữ, nút, ảnh, menu, bảng, biểu mẫu…). App tự sinh HTML/CSS, có Xem thử và xuất file HTML.');
     L.push('');

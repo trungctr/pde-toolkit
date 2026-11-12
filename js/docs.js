@@ -54,6 +54,7 @@
     crlf: false, // file gốc dùng CRLF -> giữ nguyên khi lưu
     caret: 0,
     savedAt: null, // lần cuối ghi ra file
+    libPath: null, // tài liệu mở từ thư viện mẫu: đường dẫn mẫu trong templates/ (để mở liên kết tới mẫu khác)
   };
   let ws = 'diagram'; // tab đang mở: 'doc' | 'diagram'
   // Mặc định chỉ có trình soạn TRỰC QUAN (như Word). Bật "chế độ developer" mới thấy mã Markdown:
@@ -101,7 +102,7 @@
       try {
         doc = DE.normalizeDoc(JSON.parse(json)).doc;
       } catch (e) {
-        console.warn('[Diagram Editor] Không đọc được diagram nhúng', id, e);
+        console.warn('[ChillCat Studio] Không đọc được diagram nhúng', id, e);
         return m;
       }
       if (diagrams[id] && JSON.stringify(diagrams[id]) !== JSON.stringify(doc)) {
@@ -129,7 +130,7 @@
   function saveLocalNow() {
     const ok = lsSet(
       DOC_KEY,
-      JSON.stringify({ name: state.name, text: ta.value, diagrams: usedDiagrams(), dirty: state.dirty, crlf: state.crlf, savedAt: state.savedAt })
+      JSON.stringify({ name: state.name, text: ta.value, diagrams: usedDiagrams(), dirty: state.dirty, crlf: state.crlf, savedAt: state.savedAt, libPath: state.libPath })
     );
     if (!ok) setStatus('⚠ Không lưu được vào trình duyệt (hết dung lượng?) – hãy lưu ra file', 'warn');
   }
@@ -158,6 +159,7 @@
       state.dirty = !!o.dirty;
       state.crlf = !!o.crlf;
       state.savedAt = o.savedAt || null;
+      state.libPath = typeof o.libPath === 'string' ? o.libPath : null;
       ta.value = o.text;
       return true;
     } catch (_) {
@@ -195,6 +197,13 @@
       '- **Kéo thả** file `.md` từ máy vào cửa sổ này để mở và sửa, hoặc bấm nút Mở (`Ctrl+O`).',
       '- Bấm Lưu (`Ctrl+S`) để ghi file `.md`. Diagram nằm trong file dưới dạng **hình SVG** – xem được trong',
       '  VS Code, Typora, Obsidian, trình duyệt… – kèm dữ liệu để mở lại đây và sửa tiếp.',
+      '',
+      '## Bắt đầu từ mẫu',
+      '',
+      'Bấm nút **Mẫu** trên thanh công cụ (hoặc **Tài liệu mới**) để chọn một trong 24 mẫu tài liệu thiết kế phần mềm',
+      'theo ISO/IEC/IEEE 12207: đặc tả yêu cầu (SRS), quy trình nghiệp vụ (BPMN), thiết kế chi tiết (SDD), ERD, API,',
+      'kế hoạch kiểm thử, triển khai, đánh giá rủi ro… Các mẫu nối với nhau bằng mã truy vết, có sẵn sơ đồ khung và',
+      'hướng dẫn điền. App nhớ mã dự án bạn nhập nên mọi tài liệu mở từ mẫu dùng chung một bộ mã.',
       '',
       '> [!TIP]',
       '> Muốn sửa trực tiếp mã Markdown? Bật nút **</> Developer** ở góc phải thanh công cụ.',
@@ -1114,13 +1123,14 @@
     return !!r;
   }
 
-  function setDoc(text, { name, diagrams = {}, handle = null, crlf = false, dirty = false } = {}) {
+  function setDoc(text, { name, diagrams = {}, handle = null, crlf = false, dirty = false, libPath = null } = {}) {
     state.name = name || DEFAULT_NAME;
     state.diagrams = diagrams;
     state.handle = handle;
     state.crlf = crlf;
     state.dirty = dirty;
     state.savedAt = null;
+    state.libPath = libPath;
     ta.value = text;
     ta.setSelectionRange(0, 0);
     state.caret = 0;
@@ -1150,6 +1160,17 @@
     const { text, diagrams, count } = collapse(raw.replace(/\r\n?/g, '\n'));
     setDoc(text, { name: file.name, diagrams, handle, crlf });
     toast(`Đã mở "${file.name}"` + (count ? ` – ${count} diagram có thể sửa` : ''), 'ok');
+  };
+
+  /** Mở nội dung một mẫu từ thư viện (js/doc-library.js). Trả về true nếu đã mở */
+  DOCS.openLibraryDoc = async function (raw, { name, libPath, confirmTitle = 'Mở mẫu?' }) {
+    show('doc');
+    if (!(await confirmDiscard(confirmTitle))) return false;
+    const { text, diagrams, count } = collapse(raw.replace(/\r\n?/g, '\n'));
+    // chưa ghi ra file nào: đánh dấu có thay đổi để được hỏi trước khi bỏ
+    setDoc(text, { name, diagrams, dirty: true, libPath });
+    toast(`Đã mở mẫu "${name}"` + (count ? ` – ${count} sơ đồ khung sửa được` : '') + ' · Ctrl + bấm liên kết để mở tài liệu liên quan', 'ok');
+    return true;
   };
 
   async function openDoc() {
@@ -1236,7 +1257,12 @@
     updateTitles();
   }
 
+  /** Tài liệu mới: gợi ý chọn mẫu trước, thẻ "Tài liệu trống" tạo trang trắng như cũ */
   async function newDoc() {
+    if (DE.docLib) {
+      const r = await DE.docLib.gallery({ blank: true });
+      if (r !== 'blank') return; // đã chọn mẫu (thư viện tự mở) hoặc huỷ
+    }
     if (!(await confirmDiscard('Tạo tài liệu mới?'))) return;
     setDoc('# Tiêu đề\n\n', { name: DEFAULT_NAME });
     if (visible()) {
@@ -1595,11 +1621,11 @@
     $('#ws-doc-title').textContent = name;
     $('#ws-doc-dot').hidden = !state.dirty;
     $('#doc-dirty').hidden = !state.dirty;
-    if (ws === 'doc') document.title = (state.dirty ? '● ' : '') + name + ' – Diagram Editor';
-    else if (ws === 'guide') document.title = 'Hướng dẫn sử dụng – Diagram Editor';
-    else if (ws === 'settings') document.title = 'Cài đặt – Diagram Editor';
-    else if (ws === 'design') document.title = DE.pages ? DE.pages.title() : 'Thiết kế trang – Diagram Editor';
-    else document.title = (store.doc.meta?.name ? store.doc.meta.name + ' – ' : '') + 'Diagram Editor (BPMN, UML, Flowchart)';
+    if (ws === 'doc') document.title = (state.dirty ? '● ' : '') + name + ' – ChillCat Studio';
+    else if (ws === 'guide') document.title = 'Hướng dẫn sử dụng – ChillCat Studio';
+    else if (ws === 'settings') document.title = 'Cài đặt – ChillCat Studio';
+    else if (ws === 'design') document.title = DE.pages ? DE.pages.title() : 'Thiết kế trang – ChillCat Studio';
+    else document.title = (store.doc.meta?.name ? store.doc.meta.name + ' – ' : '') + 'Diagram – ChillCat Studio';
   }
 
   function updateSessionUI() {
@@ -1814,6 +1840,8 @@
           const t = pv.querySelector('#' + CSS.escape(decodeURIComponent(href.slice(1))));
           if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } else if (/^(https?:|mailto:)/i.test(href)) window.open(href, '_blank', 'noopener');
+        else if (DE.docLib && DE.docLib.follow(href, state.libPath)) return;
+        else if (/\.md(#|$)/i.test(href)) toast(`"${href}" là file trên máy – mở bằng nút Mở (Ctrl+O) hoặc kéo thả file vào cửa sổ`, 'info');
       } else if (a) a.title = 'Ctrl + bấm để mở liên kết · Ctrl+K để sửa';
     });
     pv.addEventListener('dblclick', (e) => {
@@ -2021,6 +2049,8 @@
     if (ws !== 'doc') return null; // tab Diagram / Thiết kế trang: ui.js tự gửi kèm dữ liệu của tab
     const text = ta.value;
     let s = `[Tab hiện tại: Tài liệu – file "${state.name}"]\n`;
+    const lib = state.libPath && DE.docLib && DE.docLib.entry(state.libPath);
+    if (lib) s += `[Tài liệu được tạo từ mẫu ${lib.code} – ${lib.title} trong bộ mẫu tài liệu: giữ cấu trúc mục, khối thông tin đầu, dòng "Tài liệu liên quan" và các mã truy vết đã có]\n`;
     if (!text.trim()) return s + 'Tài liệu đang trống. Nếu người dùng yêu cầu viết tài liệu, trả về khối ````markdown đầy đủ.';
     s += 'Tài liệu đang mở (nếu yêu cầu là sửa / bổ sung thì trả lại TOÀN BỘ tài liệu đã sửa trong khối ````markdown, giữ nguyên các dòng [[diagram:…]] không cần sửa):\n````markdown\n' + text.replace(/\n+$/, '') + '\n````';
     const used = usedDiagrams();
@@ -2125,6 +2155,7 @@
     dev: () => setDev(!dev, { announce: true }),
     'file-source': () => showFileSource(),
     new: newDoc,
+    templates: () => DE.docLib && DE.docLib.gallery(),
     open: openDoc,
     save: () => saveDoc(false),
     'save-as': () => saveDoc(true),
