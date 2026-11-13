@@ -951,10 +951,42 @@
           if (KEEP_INLINE.has(tag)) {
             const t = tag.toLowerCase();
             out += `<${t}>${inlineMd(c, o)}</${t}>`;
-          } else out += inlineMd(c, o); // span, font… do dán vào: chỉ giữ chữ
+          } else if (tag === 'SPAN' || tag === 'FONT') {
+            // chữ màu / tô nền: giữ dạng <span style="color:…"> (Markdown không có cú pháp màu riêng)
+            const st = colorStyle(c, tag);
+            const inner = inlineMd(c, o);
+            out += st && inner.trim() ? `<span style="${st}">${inner}</span>` : inner;
+          } else out += inlineMd(c, o); // thẻ khác do dán vào: chỉ giữ chữ
       }
     });
     return out;
+  }
+
+  /** "rgb(…)" / "#abc" / tên màu -> giá trị gọn để ghi vào file; '' nếu không có màu */
+  function cssColor(v) {
+    v = String(v || '').trim().toLowerCase();
+    if (!v || /^(inherit|initial|unset|currentcolor|transparent)$/.test(v)) return '';
+    const m = v.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/);
+    if (m) {
+      const a = m[4] == null ? 1 : /%$/.test(m[4]) ? parseFloat(m[4]) / 100 : +m[4];
+      if (a <= 0.01) return '';
+      if (a < 0.995) return `rgba(${+m[1]},${+m[2]},${+m[3]},${Math.round(a * 100) / 100})`;
+      return '#' + [m[1], m[2], m[3]].map((x) => (+x).toString(16).padStart(2, '0')).join('');
+    }
+    return /^(#[0-9a-f]{3,8}|[a-z]{3,20})$/.test(v) ? v : '';
+  }
+  /**
+   * Kiểu màu của <span style> / <font color>. Chỉ nhận thẻ CHỈ mang màu chữ / màu nền: trình duyệt hay tự
+   * chèn <span style="font-size…; color…"> khi gộp đoạn – những thẻ đó bị bỏ, chỉ giữ chữ.
+   */
+  function colorStyle(el, tag) {
+    const st = el.style;
+    for (let i = 0; i < st.length; i++) if (!/^(color|background-color)$/.test(st[i])) return '';
+    let color = cssColor(st.color || (tag === 'FONT' ? el.getAttribute('color') : ''));
+    const bg = cssColor(st.backgroundColor);
+    // màu trùng màu chữ của khung ngoài (thẻ thừa) -> bỏ
+    if (color && el.isConnected && el.parentElement && getComputedStyle(el.parentElement).color === getComputedStyle(el).color && !st.color) color = '';
+    return [color && 'color:' + color, bg && 'background-color:' + bg].filter(Boolean).join(';');
   }
 
   /** chống việc dòng văn bản thường bị hiểu nhầm thành cú pháp khối */

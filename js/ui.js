@@ -640,8 +640,129 @@
   }
   UI.refreshAI = updateApiChip;
 
-  /** Dropdown mô hình trên khung chat (effort / thinking nằm ở tab Cài đặt) */
+  // ---- chọn nhanh effort (thanh trượt nhỏ + bảng chọn) và thinking (bóng đèn) trên khung chat
+  const EFFORT_LEVELS = [
+    ['', 'Mặc định', 'Theo mô hình đang chọn'],
+    ['low', 'Thấp', 'Nhanh, ít token'],
+    ['medium', 'Trung bình', 'Cân bằng tốc độ và độ kỹ'],
+    ['high', 'Cao', 'Kỹ hơn, chậm hơn'],
+    ['xhigh', 'Rất cao', 'Cho việc khó: tài liệu dài, trang nhiều phần'],
+    ['max', 'Tối đa', 'Kỹ nhất – chậm và tốn token nhất'],
+  ];
+  /** Vị trí trên thanh: low…max = 0…4; mặc định = -1 */
+  const effortPos = (v) => EFFORT_LEVELS.findIndex((x) => x[0] === v) - 1;
+  const effortName = (v) => (EFFORT_LEVELS.find((x) => x[0] === v) || EFFORT_LEVELS[0])[1];
+  function renderEffortThink() {
+    const btn = $('#ai-effort'), bulb = $('#ai-think');
+    if (!btn || !bulb) return;
+    const c = DE.ai.load();
+    const eff = c.effort || '';
+    const k = effortPos(eff);
+    btn.classList.toggle('is-default', k < 0);
+    btn.style.setProperty('--k', k < 0 ? 2 : k);
+    btn.title = `Effort: ${effortName(eff)}${k < 0 ? ' (theo mô hình)' : ''} – bấm để chọn mức suy luận`;
+    const pop = $('#ai-effort-pop');
+    if (pop && !pop.hidden) renderEffortPop();
+    const caps = DE.ai.thinkingCaps(c.provider, c.models[c.provider]);
+    const on = c.thinking !== false || !caps.canDisable;
+    bulb.classList.toggle('on', on);
+    bulb.classList.toggle('locked', !caps.canDisable);
+    bulb.setAttribute('aria-pressed', String(on));
+    bulb.title = !caps.canDisable
+      ? `Thinking luôn bật với mô hình này – ${caps.note}`
+      : on
+        ? 'Thinking: đang bật – mô hình suy luận trước khi trả lời (bấm để tắt: trả lời nhanh, ít token)'
+        : 'Thinking: đang tắt – trả lời nhanh, ít token (bấm để bật: kỹ hơn)';
+  }
+  function renderEffortPop() {
+    const pop = $('#ai-effort-pop');
+    const cur = DE.ai.load().effort || '';
+    pop.innerHTML =
+      '<div class="ai-pop-head"><b>Effort</b><span>mức suy luận / công sức</span></div>' +
+      EFFORT_LEVELS.map(([v, name, sub]) => {
+        const k = effortPos(v);
+        const bars = [0, 1, 2, 3, 4].map((i) => `<i class="${k >= i ? 'on' : ''}"></i>`).join('');
+        return (
+          `<button type="button" role="menuitemradio" aria-checked="${v === cur}" class="ai-pop-item${v === cur ? ' cur' : ''}" data-eff="${v}">` +
+          `<span class="ai-eff-bars${k < 0 ? ' auto' : ''}" aria-hidden="true">${k < 0 ? 'A' : bars}</span>` +
+          `<span class="ai-pop-text"><b>${esc(name)}</b><small>${esc(sub)}</small></span>` +
+          `<span class="ai-pop-check" aria-hidden="true">${v === cur ? '✓' : ''}</span></button>`
+        );
+      }).join('') +
+      '<p class="ai-pop-foot">Áp dụng cho mọi câu hỏi · mô hình không nhận mức này thì tự dùng mặc định</p>';
+  }
+  function setEffort(v) {
+    const c = DE.ai.load();
+    if ((c.effort || '') === v) return;
+    c.effort = v;
+    DE.ai.save(c);
+    updateApiChip();
+  }
+  function openEffortPop() {
+    const pop = $('#ai-effort-pop'), btn = $('#ai-effort');
+    renderEffortPop();
+    pop.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    const cur = pop.querySelector('.ai-pop-item.cur') || pop.querySelector('.ai-pop-item');
+    if (cur) cur.focus();
+    setTimeout(() => document.addEventListener('pointerdown', onPopOutside, true), 0);
+  }
+  function closeEffortPop(focusBtn) {
+    const pop = $('#ai-effort-pop'), btn = $('#ai-effort');
+    if (!pop || pop.hidden) return;
+    pop.hidden = true;
+    btn.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('pointerdown', onPopOutside, true);
+    if (focusBtn) btn.focus();
+  }
+  function onPopOutside(e) {
+    if (!e.target.closest('.ai-effort-wrap')) closeEffortPop(false);
+  }
+  function initEffortThink() {
+    const btn = $('#ai-effort'), pop = $('#ai-effort-pop'), bulb = $('#ai-think');
+    if (!btn || !pop || !bulb) return;
+    btn.addEventListener('click', () => (pop.hidden ? openEffortPop() : closeEffortPop(true)));
+    // ← → trên thanh: đổi mức ngay, không cần mở bảng
+    btn.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const i = EFFORT_LEVELS.findIndex((x) => x[0] === (DE.ai.load().effort || ''));
+      const j = Math.max(0, Math.min(EFFORT_LEVELS.length - 1, i + (e.key === 'ArrowRight' ? 1 : -1)));
+      setEffort(EFFORT_LEVELS[j][0]);
+    });
+    pop.addEventListener('click', (e) => {
+      const it = e.target.closest('[data-eff]');
+      if (!it) return;
+      setEffort(it.dataset.eff);
+      closeEffortPop(true);
+    });
+    pop.addEventListener('keydown', (e) => {
+      const items = [...pop.querySelectorAll('.ai-pop-item')];
+      const i = items.indexOf(document.activeElement);
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        closeEffortPop(true);
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const j = (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+        items[j].focus();
+      } else if (e.key === 'Tab') closeEffortPop(false);
+    });
+    bulb.addEventListener('click', () => {
+      const c = DE.ai.load();
+      const caps = DE.ai.thinkingCaps(c.provider, c.models[c.provider]);
+      if (!caps.canDisable) return UI.toast(caps.note, 'info');
+      c.thinking = c.thinking === false;
+      DE.ai.save(c);
+      updateApiChip();
+      UI.toast(c.thinking ? 'Đã bật thinking – mô hình suy luận trước khi trả lời' : 'Đã tắt thinking – trả lời nhanh, ít token hơn', 'info');
+    });
+  }
+
+  /** Dropdown mô hình + effort + thinking trên khung chat */
   function renderQuickControls() {
+    renderEffortThink();
     const sel = $('#ai-model-quick');
     if (!sel) return;
     const c = DE.ai.load(), p = c.provider, P = DE.ai.PROVIDERS[p], cur = c.models[p];
@@ -661,6 +782,7 @@
   }
 
   function initQuickControls() {
+    initEffortThink();
     $('#ai-model-quick').addEventListener('change', (e) => {
       const v = e.target.value;
       if (v === '__settings' || !v) {

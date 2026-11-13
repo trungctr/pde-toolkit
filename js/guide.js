@@ -67,10 +67,16 @@ bấm **Lưu cài đặt AI**). Nút **← Quay lại** ở góc dưới trái �
 ### Gõ và định dạng
 
 Gõ trực tiếp vào trang. Thanh công cụ (từ trái sang): **Mới · Mở · Lưu · tên file** – **H1 H2 H3** (tiêu đề) –
-**B** đậm · *I* nghiêng · ~~S~~ gạch · \`</>\` code – liên kết · ảnh – danh sách · danh sách số · việc cần làm –
-trích dẫn · khối code · bảng · đường kẻ – **∑** công thức · **[1]** chú thích · mục lục.
+**B** đậm · *I* nghiêng · ~~S~~ gạch · **A** màu chữ / tô nền · \`</>\` code – liên kết · ảnh – danh sách · danh sách số ·
+việc cần làm – trích dẫn · khối code · bảng · đường kẻ – **∑** công thức · **[1]** chú thích · mục lục.
 
 - Bôi đen chữ rồi bấm nút để định dạng; bấm lại để bỏ.
+- **Màu chữ / tô nền** (nút **A**): bôi đen đoạn chữ → chọn màu chữ hoặc màu nền (có “Màu khác…” và **Bỏ màu**). File \`.md\` lưu
+  thành \`<span style="color:…">\` – app, VS Code và file HTML xuất ra đều hiện màu, riêng GitHub không hiện.
+- **Trích dẫn**: chọn **Trích dẫn** thường (viền xám) hoặc khối ghi chú có màu – **Ghi chú** (xanh dương), **Mẹo** (xanh lá, như các
+  khối hướng dẫn trong mẫu), **Quan trọng** (tím), **Cảnh báo** (vàng), **Thận trọng** (đỏ); mở lại để đổi kiểu hoặc **Bỏ trích dẫn**.
+- **Bảng**: rê chuột chọn số **cột × hàng** (hoặc nhập số) – hàng đầu là hàng tiêu đề. Đặt con trỏ trong bảng để hiện thanh sửa bảng:
+  thêm hàng trên / dưới, thêm cột trái / phải, căn trái / giữa / phải cả cột, xoá hàng, xoá cột, xoá bảng.
 - \`Ctrl+B\` đậm · \`Ctrl+I\` nghiêng · \`Ctrl+K\` liên kết · \`Ctrl+E\` code · \`Tab\` / \`Shift+Tab\` thụt lề danh sách.
 - **Liên kết**: bấm vào liên kết để sửa chữ; \`Ctrl\` + bấm để mở.
 - **Ảnh**: nhập địa chỉ ảnh, chọn ảnh từ máy, dán ảnh (\`Ctrl+V\`) hoặc kéo thả ảnh vào trang – ảnh từ máy được nhúng thẳng vào file.
@@ -355,7 +361,9 @@ Bấm **Nhập HTML** trên thanh công cụ (hoặc **kéo thả file \`.html\`
    hoặc chạy trên máy với **Ollama** / **LM Studio**. Bấm “Lấy API key ↗” để tạo key.
 3. Dán key, chọn mô hình, bấm **Lưu cài đặt AI**. Ngay bên dưới có **Effort** và **Thinking** để AI trả lời kỹ hơn hay nhanh hơn.
 
-Đổi mô hình nhanh: dropdown mô hình ngay trên khung chat.
+Đổi nhanh ngay trên khung chat: dropdown **mô hình**; **thanh effort** (thanh tím nhỏ – bấm để chọn mức Mặc định / Thấp /
+Trung bình / Cao / Rất cao / Tối đa, hoặc dùng phím \`←\` \`→\` khi thanh đang được chọn); **bóng đèn 💡** bật / tắt thinking
+(đèn sáng = đang bật; một số mô hình luôn suy luận nên đèn không tắt được).
 
 > [!IMPORTANT]
 > API key chỉ lưu trong trình duyệt này và chỉ gửi thẳng tới nhà cung cấp bạn chọn. Không nên lưu key trên máy dùng chung.

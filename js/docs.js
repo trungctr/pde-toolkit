@@ -600,12 +600,7 @@
       });
       onVisualInput();
     },
-    quote: () => {
-      ensureVisualFocus();
-      const a = anchorEl();
-      if (a && a.closest('blockquote') && pv.contains(a.closest('blockquote'))) exec('outdent');
-      else exec('formatBlock', '<blockquote>');
-    },
+    quote: (b) => (b ? quoteMenu(b, true) : setQuoteVisual('')),
     codeblock: () => {
       ensureVisualFocus();
       const b = currentBlock();
@@ -613,14 +608,493 @@
     },
     link: () => linkDialog(),
     image: () => imageDialog(),
-    table: () =>
-      exec(
-        'insertHTML',
-        '<div class="md-table"><table><thead><tr><th>Cột 1</th><th>Cột 2</th><th>Cột 3</th></tr></thead>' +
-          '<tbody><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></tbody></table></div><p><br></p>'
-      ),
-    hr: () => exec('insertHorizontalRule'),
+    table: (b) => (b ? tablePicker(b, true) : insertTable(3, 3, true)),
+    color: (b) => b && colorPicker(b, true),
+    // insertHorizontalRule gắn id="null" vào thẻ; chèn kèm một đoạn trống để gõ tiếp bên dưới
+    hr: () => exec('insertHTML', '<hr><p><br></p>'),
   };
+
+  // ===================================================== BẢNG CHỌN NHỎ DƯỚI NÚT (bảng, trích dẫn, màu chữ)
+  let fmtPop = null;
+  function closeFmtPop() {
+    if (!fmtPop) return;
+    fmtPop.remove();
+    fmtPop = null;
+    document.removeEventListener('pointerdown', onFmtPopOutside, true);
+    window.removeEventListener('keydown', onFmtPopKey, true);
+    document.querySelectorAll('.doc-toolbar [data-fmt][aria-expanded="true"]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+  }
+  function onFmtPopOutside(e) {
+    if (fmtPop && !fmtPop.contains(e.target) && !e.target.closest('.doc-toolbar [data-fmt]')) closeFmtPop();
+  }
+  function onFmtPopKey(e) {
+    if (e.key !== 'Escape') return;
+    e.preventDefault();
+    e.stopPropagation();
+    closeFmtPop();
+  }
+  /** Mở bảng nhỏ ngay dưới nút; bấm lại nút thì đóng. Trả về phần tử bảng (hoặc null khi vừa đóng) */
+  function openFmtPop(btn, cls, html) {
+    const same = fmtPop && fmtPop.dataset.for === btn.dataset.fmt;
+    closeFmtPop();
+    if (same) return null;
+    const pop = document.createElement('div');
+    pop.className = 'fmt-pop ' + cls;
+    pop.dataset.for = btn.dataset.fmt;
+    pop.setAttribute('role', 'dialog');
+    pop.innerHTML = html;
+    // giữ con trỏ / vùng chọn trong trình soạn khi bấm vào bảng (trừ ô nhập số, chọn màu)
+    pop.addEventListener('mousedown', (e) => {
+      if (!e.target.closest('input, select, textarea, label')) e.preventDefault();
+    });
+    document.body.appendChild(pop);
+    const r = btn.getBoundingClientRect();
+    pop.style.left = Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8)) + 'px';
+    pop.style.top = r.bottom + 6 + 'px';
+    btn.setAttribute('aria-expanded', 'true');
+    fmtPop = pop;
+    setTimeout(() => {
+      document.addEventListener('pointerdown', onFmtPopOutside, true);
+      window.addEventListener('keydown', onFmtPopKey, true);
+    }, 0);
+    return pop;
+  }
+
+  // ---- bảng: chọn số cột × hàng
+  const TP_C = 10, TP_R = 8;
+  function tablePicker(btn, visual) {
+    let cells = '';
+    for (let r = 1; r <= TP_R; r++) for (let c = 1; c <= TP_C; c++) cells += `<button type="button" tabindex="-1" data-r="${r}" data-c="${c}" aria-label="${c} cột × ${r} hàng"></button>`;
+    const pop = openFmtPop(
+      btn,
+      'tp-pop',
+      `<div class="tp-label">Rê chuột để chọn số cột × hàng</div><div class="tp-grid" style="--tp-c:${TP_C}">${cells}</div>` +
+        '<div class="tp-exact"><label>Cột <input type="number" min="1" max="30" value="3" data-tp="c"></label><label>Hàng <input type="number" min="2" max="300" value="3" data-tp="r"></label>' +
+        '<button type="button" class="btn primary" data-tp="ok">Chèn</button></div>' +
+        '<p class="tp-hint">Hàng đầu là hàng tiêu đề. Đặt con trỏ trong bảng để thêm / xoá hàng, cột, căn chữ.</p>'
+    );
+    if (!pop) return;
+    const grid = pop.querySelector('.tp-grid'), label = pop.querySelector('.tp-label');
+    const mark = (R, C) => {
+      grid.querySelectorAll('button').forEach((b) => b.classList.toggle('on', +b.dataset.r <= R && +b.dataset.c <= C));
+      label.textContent = R ? `${C} cột × ${R} hàng (1 hàng tiêu đề)` : 'Rê chuột để chọn số cột × hàng';
+    };
+    grid.addEventListener('pointerover', (e) => {
+      const b = e.target.closest('[data-r]');
+      if (b) mark(+b.dataset.r, +b.dataset.c);
+    });
+    grid.addEventListener('pointerleave', () => mark(0, 0));
+    pop.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-r]');
+      if (b) return insertTable(Math.max(2, +b.dataset.r), +b.dataset.c, visual);
+      if (e.target.closest('[data-tp="ok"]')) {
+        const c = Math.max(1, Math.min(30, +pop.querySelector('[data-tp="c"]').value || 3));
+        const r = Math.max(2, Math.min(300, +pop.querySelector('[data-tp="r"]').value || 3));
+        insertTable(r, c, visual);
+      }
+    });
+    pop.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target.matches('[data-tp]')) {
+        e.preventDefault();
+        pop.querySelector('[data-tp="ok"]').click();
+      }
+    });
+  }
+  /** Chèn bảng rows hàng (gồm hàng tiêu đề) × cols cột */
+  function insertTable(rows, cols, visual) {
+    closeFmtPop();
+    if (!visual) {
+      const head = '| ' + Array.from({ length: cols }, (_, i) => `Cột ${i + 1}`).join(' | ') + ' |';
+      const sep = '| ' + Array(cols).fill('---').join(' | ') + ' |';
+      const row = '|' + Array(cols).fill('   ').join('|') + '|';
+      insertBlock([head, sep, ...Array(rows - 1).fill(row)].join('\n'), null, [2, 7]);
+      return;
+    }
+    const th = Array.from({ length: cols }, (_, i) => `<th>Cột ${i + 1}</th>`).join('');
+    const tr = '<tr>' + '<td><br></td>'.repeat(cols) + '</tr>';
+    exec('insertHTML', `<div class="md-table"><table><thead><tr>${th}</tr></thead><tbody>${tr.repeat(rows - 1)}</tbody></table></div><p><br></p>`);
+    // chọn sẵn chữ "Cột 1" để gõ đè tiêu đề
+    const blk = currentBlock();
+    const tbl = blk && blk.previousElementSibling;
+    const first = tbl && tbl.classList.contains('md-table') ? tbl.querySelector('th') : null;
+    if (first) {
+      const r = document.createRange();
+      r.selectNodeContents(first);
+      const s = getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    }
+    onVisualInput();
+  }
+
+  // ---- thanh công cụ bảng: hiện khi con trỏ đang ở trong một bảng (trình soạn trực quan)
+  let tblBar = null, tblRaf = 0;
+  const TB = [
+    ['row-above', '↥ Hàng', 'Thêm hàng phía trên'],
+    ['row-below', '↧ Hàng', 'Thêm hàng phía dưới'],
+    ['col-left', '↤ Cột', 'Thêm cột bên trái'],
+    ['col-right', '↦ Cột', 'Thêm cột bên phải'],
+    ['|'],
+    ['align-left', '⇤', 'Căn trái cả cột'],
+    ['align-center', '↔', 'Căn giữa cả cột'],
+    ['align-right', '⇥', 'Căn phải cả cột'],
+    ['|'],
+    ['row-del', '✕ Hàng', 'Xoá hàng đang chọn'],
+    ['col-del', '✕ Cột', 'Xoá cột đang chọn'],
+    ['del', '🗑 Bảng', 'Xoá cả bảng'],
+  ];
+  function cellAtCaret() {
+    const a = anchorEl();
+    if (!a || !pv.contains(a) || view === 'code') return null;
+    const c = a.closest('td, th');
+    return c && pv.contains(c) && !c.closest('.md-frontmatter') ? c : null;
+  }
+  function scheduleTableBar() {
+    if (tblRaf) return;
+    tblRaf = requestAnimationFrame(() => {
+      tblRaf = 0;
+      updateTableBar();
+    });
+  }
+  function hideTableBar() {
+    if (tblBar) tblBar.hidden = true;
+  }
+  function updateTableBar() {
+    const cell = ws === 'doc' ? cellAtCaret() : null;
+    if (!cell) return hideTableBar();
+    if (!tblBar) {
+      tblBar = document.createElement('div');
+      tblBar.className = 'tbl-bar';
+      tblBar.setAttribute('role', 'toolbar');
+      tblBar.setAttribute('aria-label', 'Sửa bảng');
+      tblBar.innerHTML = TB.map(([op, ic, t]) => (op === '|' ? '<span class="tbl-sep"></span>' : `<button type="button" data-tb="${op}" title="${t}">${ic}</button>`)).join('');
+      tblBar.addEventListener('mousedown', (e) => e.preventDefault());
+      tblBar.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-tb]');
+        if (b && !b.disabled) tableOp(b.dataset.tb);
+      });
+      document.body.appendChild(tblBar);
+    }
+    const inHead = !!cell.closest('thead');
+    tblBar.querySelector('[data-tb="row-above"]').disabled = inHead;
+    tblBar.querySelector('[data-tb="row-del"]').disabled = inHead;
+    const al = cell.style.textAlign;
+    for (const x of ['left', 'center', 'right']) tblBar.querySelector(`[data-tb="align-${x}"]`).classList.toggle('on', al === x);
+    tblBar.hidden = false;
+    const t = (cell.closest('.md-table') || cell.closest('table')).getBoundingClientRect();
+    const w = pvWrap.getBoundingClientRect();
+    const h = tblBar.offsetHeight || 30;
+    let top = t.top - h - 6;
+    if (top < w.top + 2) top = Math.min(t.bottom + 6, w.bottom - h - 4);
+    tblBar.style.top = Math.max(w.top + 2, top) + 'px';
+    tblBar.style.left = Math.max(w.left + 4, Math.min(t.left, w.right - tblBar.offsetWidth - 8)) + 'px';
+  }
+  function placeCaret(el) {
+    if (!el) return;
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    r.collapse(true);
+    const s = getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+  }
+  function tableOp(op) {
+    const cell = cellAtCaret();
+    if (!cell) return;
+    const tr = cell.parentElement, table = cell.closest('table');
+    const rows = [...table.querySelectorAll('tr')].filter((r) => r.closest('table') === table);
+    const ci = [...tr.children].indexOf(cell);
+    const cols = Math.max(...rows.map((r) => r.children.length));
+    const inHead = !!cell.closest('thead');
+    const head = rows[0];
+    const newCell = (tag, col) => {
+      const c = document.createElement(tag);
+      c.appendChild(document.createElement('br'));
+      const ref = head && head.children[col];
+      if (ref && ref.style.textAlign) c.style.textAlign = ref.style.textAlign;
+      return c;
+    };
+    let focus = null;
+    switch (op) {
+      case 'row-above':
+      case 'row-below': {
+        const nr = document.createElement('tr');
+        for (let i = 0; i < cols; i++) nr.appendChild(newCell('td', i));
+        if (inHead) {
+          const tb = table.tBodies[0] || table.appendChild(document.createElement('tbody'));
+          tb.insertBefore(nr, tb.firstChild);
+        } else tr.parentElement.insertBefore(nr, op === 'row-above' ? tr : tr.nextSibling);
+        focus = nr.children[Math.min(ci, cols - 1)];
+        break;
+      }
+      case 'col-left':
+      case 'col-right': {
+        const at = op === 'col-left' ? ci : ci + 1;
+        for (const r of rows) {
+          const isHead = !!r.closest('thead');
+          const c = newCell(isHead ? 'th' : 'td', -1);
+          if (isHead) c.textContent = 'Cột mới';
+          r.insertBefore(c, r.children[at] || null);
+        }
+        focus = tr.children[at];
+        break;
+      }
+      case 'row-del': {
+        if (inHead) return toast('Hàng tiêu đề không xoá được – bảng Markdown luôn cần một hàng tiêu đề', 'info');
+        const next = tr.nextElementSibling || tr.previousElementSibling;
+        tr.remove();
+        focus = next ? next.children[Math.min(ci, next.children.length - 1)] : head && head.children[ci];
+        break;
+      }
+      case 'col-del': {
+        if (cols <= 1) return tableOp('del');
+        for (const r of rows) if (r.children[ci]) r.children[ci].remove();
+        focus = tr.children[Math.max(0, ci - 1)];
+        break;
+      }
+      case 'align-left':
+      case 'align-center':
+      case 'align-right': {
+        const v = op.slice(6);
+        const same = cell.style.textAlign === v; // bấm lại: bỏ căn
+        for (const r of rows) if (r.children[ci]) r.children[ci].style.textAlign = same ? '' : v;
+        focus = cell;
+        break;
+      }
+      case 'del': {
+        const wrap = table.closest('.md-table') || table;
+        const p = document.createElement('p');
+        p.appendChild(document.createElement('br'));
+        wrap.replaceWith(p);
+        focus = p;
+        hideTableBar();
+        break;
+      }
+    }
+    pv.focus({ preventScroll: true });
+    placeCaret(focus);
+    onVisualInput();
+    scheduleTableBar();
+  }
+
+  // ---- trích dẫn: thường hoặc khối ghi chú có màu (GitHub alert: > [!TIP] …)
+  const QUOTES = [
+    ['', 'Trích dẫn', 'Khối trích dẫn thường, viền xám', '#8c959f'],
+    ['NOTE', 'Ghi chú', 'Thông tin người đọc nên biết', '#0969da'],
+    ['TIP', 'Mẹo', 'Gợi ý, hướng dẫn (như trong các mẫu)', '#1a7f37'],
+    ['IMPORTANT', 'Quan trọng', 'Điều cần thiết để đạt mục tiêu', '#8250df'],
+    ['WARNING', 'Cảnh báo', 'Cần chú ý ngay để tránh sự cố', '#9a6700'],
+    ['CAUTION', 'Thận trọng', 'Rủi ro, hậu quả xấu nếu làm sai', '#d1242f'],
+  ];
+  const ALERT_TITLES = { note: 'Ghi chú', tip: 'Mẹo', important: 'Quan trọng', warning: 'Cảnh báo', caution: 'Thận trọng' };
+  /** Kiểu trích dẫn tại con trỏ: '' thường · 'TIP'… · null nếu không ở trong trích dẫn */
+  function quoteAtCaret(visual) {
+    if (!visual) {
+      const v = ta.value, s = v.lastIndexOf('\n', ta.selectionStart - 1) + 1;
+      let k = s;
+      // lùi lên tới dòng đầu của khối trích dẫn
+      while (k > 0) {
+        const p = v.lastIndexOf('\n', k - 2) + 1;
+        if (!/^[ \t]*>/.test(v.slice(p, k - 1))) break;
+        k = p;
+      }
+      const line = v.slice(k, v.indexOf('\n', k) < 0 ? v.length : v.indexOf('\n', k));
+      if (!/^[ \t]*>/.test(v.slice(s, v.indexOf('\n', s) < 0 ? v.length : v.indexOf('\n', s)))) return null;
+      const m = line.match(/^[ \t]*>[ \t]?\[!(\w+)\]/);
+      return m ? m[1].toUpperCase() : '';
+    }
+    const a = anchorEl();
+    if (!a || !pv.contains(a)) return null;
+    const al = a.closest('.md-alert');
+    if (al && pv.contains(al)) return (al.getAttribute('data-type') || (al.className.match(/md-alert-(\w+)/) || [])[1] || 'NOTE').toUpperCase();
+    return a.closest('blockquote') && pv.contains(a.closest('blockquote')) ? '' : null;
+  }
+  function quoteMenu(btn, visual) {
+    const cur = quoteAtCaret(visual);
+    const pop = openFmtPop(
+      btn,
+      'qm-pop',
+      QUOTES.map(
+        ([t, name, sub, col]) =>
+          `<button type="button" class="qm-item${cur === t ? ' cur' : ''}" data-q="${t}" style="--qc:${col}"><span class="qm-bar" aria-hidden="true"></span><span><b>${esc(name)}</b><small>${esc(sub)}</small></span>${cur === t ? '<span class="qm-check" aria-hidden="true">✓</span>' : ''}</button>`
+      ).join('') + (cur != null ? '<button type="button" class="qm-item qm-off" data-q="off"><span class="qm-bar" aria-hidden="true"></span><span><b>Bỏ trích dẫn</b><small>Trả về đoạn văn thường</small></span></button>' : '')
+    );
+    if (!pop) return;
+    pop.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-q]');
+      if (!b) return;
+      closeFmtPop();
+      const t = b.dataset.q === 'off' ? null : b.dataset.q;
+      if (visual) setQuoteVisual(t);
+      else setQuoteCode(t);
+    });
+  }
+  const alertTitleEl = (kind) => {
+    const p = document.createElement('p');
+    p.className = 'md-alert-title';
+    p.contentEditable = 'false';
+    p.textContent = ALERT_TITLES[kind] || 'Ghi chú';
+    return p;
+  };
+  const makeAlert = (type) => {
+    const kind = type.toLowerCase();
+    const d = document.createElement('div');
+    d.className = `md-alert md-alert-${kind}`;
+    d.setAttribute('data-type', type);
+    d.appendChild(alertTitleEl(kind));
+    return d;
+  };
+  /** Đổi khối tại con trỏ: '' trích dẫn thường · 'TIP'… khối ghi chú màu · null bỏ trích dẫn */
+  function setQuoteVisual(type) {
+    ensureVisualFocus();
+    const a = anchorEl();
+    if (!a || !pv.contains(a)) return;
+    const al = a.closest('.md-alert'), bq = a.closest('blockquote');
+    const box = al && pv.contains(al) ? al : bq && pv.contains(bq) ? bq : null;
+    const content = (el) => [...el.childNodes].filter((n) => !(n.nodeType === 1 && n.classList.contains('md-alert-title')));
+    let target = null;
+    if (box) {
+      if (type === null) {
+        const kids = content(box);
+        box.replaceWith(...kids);
+        target = kids.find((n) => n.nodeType === 1) || null;
+      } else if (type === '') {
+        if (box.tagName === 'BLOCKQUOTE') return;
+        const q = document.createElement('blockquote');
+        q.append(...content(box));
+        box.replaceWith(q);
+        target = q.firstElementChild;
+      } else if (box.classList.contains('md-alert')) {
+        const kind = type.toLowerCase();
+        box.className = `md-alert md-alert-${kind}`;
+        box.setAttribute('data-type', type);
+        box.removeAttribute('data-title');
+        const t = box.querySelector(':scope > .md-alert-title');
+        if (t) t.textContent = ALERT_TITLES[kind];
+        else box.prepend(alertTitleEl(kind));
+        target = a;
+      } else {
+        const d = makeAlert(type);
+        d.append(...content(box));
+        box.replaceWith(d);
+        target = d.children[1];
+      }
+    } else {
+      if (type === null) return;
+      if (type === '') return exec('formatBlock', '<blockquote>');
+      // bọc các khối (cấp ngoài cùng) nằm trong vùng chọn
+      const s = getSelection();
+      const r = s.rangeCount ? s.getRangeAt(0) : null;
+      const top = (n) => {
+        let x = n.nodeType === 1 ? n : n.parentElement;
+        while (x && x.parentElement !== pv) x = x.parentElement;
+        return x;
+      };
+      const first = top(r ? r.startContainer : a), last = top(r ? r.endContainer : a);
+      if (!first) return;
+      const blocks = [first];
+      for (let x = first; x !== last && x.nextElementSibling; ) blocks.push((x = x.nextElementSibling));
+      const d = makeAlert(type);
+      first.before(d);
+      d.append(...blocks);
+      target = blocks[0];
+    }
+    if (target) {
+      pv.focus({ preventScroll: true });
+      placeCaret(target.nodeType === 1 ? target : target.parentElement);
+    }
+    onVisualInput();
+  }
+  /** Chế độ mã: đổi các dòng đang chọn thành > / > [!TIP] … hoặc bỏ */
+  function setQuoteCode(type) {
+    const v = ta.value;
+    let s = v.lastIndexOf('\n', ta.selectionStart - 1) + 1;
+    let endPos = ta.selectionEnd;
+    if (endPos > ta.selectionStart && v[endPos - 1] === '\n') endPos--;
+    let e = v.indexOf('\n', endPos);
+    if (e < 0) e = v.length;
+    // mở rộng ra cả khối trích dẫn đang đứng
+    const isQ = (l) => /^[ \t]*>/.test(l);
+    if (isQ(v.slice(s, e))) {
+      while (s > 0) {
+        const p = v.lastIndexOf('\n', s - 2) + 1;
+        if (!isQ(v.slice(p, s - 1))) break;
+        s = p;
+      }
+      while (e < v.length) {
+        const n2 = v.indexOf('\n', e + 1) < 0 ? v.length : v.indexOf('\n', e + 1);
+        if (!isQ(v.slice(e + 1, n2))) break;
+        e = n2;
+      }
+    }
+    let lines = v.slice(s, e).split('\n').map((l) => l.replace(/^[ \t]*>[ \t]?/, ''));
+    if (/^\[!\w+\][-+]?/.test(lines[0] || '')) lines = lines.slice(1);
+    const out = type === null ? lines : (type ? [`> [!${type}]`] : []).concat(lines.map((l) => (l ? '> ' + l : '>')));
+    const text = out.join('\n');
+    replaceRange(s, e, text, s, s + text.length);
+  }
+
+  // ---- màu chữ / tô nền
+  // màu tầm trung: đọc được trên nền sáng lẫn nền tối; nền tô dùng màu trong suốt nhẹ cho cả hai giao diện
+  const FG = [['#e5534b', 'Đỏ'], ['#e16f24', 'Cam'], ['#c69026', 'Vàng đậm'], ['#2da44e', 'Xanh lá'], ['#2f81f7', 'Xanh dương'], ['#a371f7', 'Tím'], ['#db61a2', 'Hồng'], ['#8b949e', 'Xám']];
+  const BG = [['rgba(255,129,130,0.35)', 'Đỏ nhạt'], ['rgba(255,166,87,0.35)', 'Cam nhạt'], ['rgba(255,212,59,0.4)', 'Vàng'], ['rgba(74,194,107,0.3)', 'Xanh lá nhạt'], ['rgba(84,174,255,0.3)', 'Xanh dương nhạt'], ['rgba(194,151,255,0.3)', 'Tím nhạt'], ['rgba(255,128,200,0.3)', 'Hồng nhạt'], ['rgba(140,149,159,0.25)', 'Xám nhạt']];
+  function colorPicker(btn, visual) {
+    const sw = (kind, list) => list.map(([c, n]) => `<button type="button" class="cp-sw" data-${kind}="${c}" style="--sw:${c}" title="${n}" aria-label="${n}">${kind === 'fg' ? 'A' : ''}</button>`).join('');
+    const pop = openFmtPop(
+      btn,
+      'cp-pop',
+      `<div class="cp-row"><span class="cp-lab">Màu chữ</span><div class="cp-sws">${sw('fg', FG)}<label class="cp-sw cp-custom" title="Màu khác…"><input type="color" value="#e5534b" data-fgc>＋</label></div></div>` +
+        `<div class="cp-row"><span class="cp-lab">Tô nền</span><div class="cp-sws">${sw('bg', BG)}<label class="cp-sw cp-custom" title="Màu nền khác…"><input type="color" value="#fff8c5" data-bgc>＋</label></div></div>` +
+        '<div class="cp-foot"><button type="button" class="btn" data-cx>Bỏ màu</button><span class="tp-hint">Chọn đoạn chữ trước rồi bấm màu. File .md lưu thành <code>&lt;span style="color:…"&gt;</code> – GitHub không hiện màu này.</span></div>'
+    );
+    if (!pop) return;
+    pop.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-fg], [data-bg], [data-cx]');
+      if (!b) return;
+      if (b.dataset.fg) applyColor('fg', b.dataset.fg, visual);
+      else if (b.dataset.bg) applyColor('bg', b.dataset.bg, visual);
+      else applyColor(null, '', visual);
+      closeFmtPop();
+    });
+    pop.addEventListener('change', (e) => {
+      if (e.target.matches('[data-fgc]')) applyColor('fg', e.target.value, visual);
+      else if (e.target.matches('[data-bgc]')) applyColor('bg', e.target.value, visual);
+      else return;
+      closeFmtPop();
+    });
+  }
+  /** kind: 'fg' màu chữ · 'bg' tô nền · null bỏ màu */
+  function applyColor(kind, val, visual) {
+    if (!visual) {
+      const s = ta.selectionStart, e = ta.selectionEnd;
+      const sel = ta.value.slice(s, e);
+      if (!kind) {
+        const bare = sel.replace(/<span style="[^"]*">|<\/span>/g, '');
+        return replaceRange(s, e, bare, s, s + bare.length);
+      }
+      return wrapSel(`<span style="${kind === 'fg' ? 'color' : 'background-color'}:${val}">`, '</span>', 'chữ màu');
+    }
+    ensureVisualFocus();
+    const s = getSelection();
+    if (!s.rangeCount || s.isCollapsed) return toast('Chọn (bôi đen) đoạn chữ cần đổi màu trước', 'info');
+    if (!kind) {
+      const r = s.getRangeAt(0);
+      const hits = [...pv.querySelectorAll('span[style], font')].filter((el) => r.intersectsNode(el) && !el.closest('.md-math, .md-emoji'));
+      for (const el of hits) {
+        el.style.removeProperty('color');
+        el.style.removeProperty('background-color');
+        el.removeAttribute('color');
+        if (el.tagName === 'FONT' || !el.getAttribute('style')) el.replaceWith(...el.childNodes);
+      }
+      onVisualInput();
+      return;
+    }
+    // styleWithCSS chỉ bật trong lúc tô màu (để ra <span style>, không phải <font>); tắt lại để B / I vẫn ra <b>/<i>
+    document.execCommand('styleWithCSS', false, true);
+    document.execCommand(kind === 'fg' ? 'foreColor' : 'hiliteColor', false, val);
+    document.execCommand('styleWithCSS', false, false);
+    onVisualInput();
+  }
 
   /** Hộp thoại nhập liệu nhỏ. fields: [{ name, label, value, placeholder }] -> Promise<object | null> */
   function formDialog({ title, fields, ok = 'Áp dụng', extra = '', onExtra }) {
@@ -1029,7 +1503,8 @@
     ul: () => prefixLines(() => '- ', /^[ \t]*(?:[-*+]|\d+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?/),
     ol: () => prefixLines((k) => `${k + 1}. `, /^[ \t]*(?:[-*+]|\d+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?/),
     task: () => prefixLines(() => '- [ ] ', /^[ \t]*(?:[-*+]|\d+[.)])[ \t]+(?:\[[ xX]\][ \t]+)?/),
-    quote: () => prefixLines(() => '> ', /^[ \t]*>[ \t]?/),
+    quote: (b) => (b ? quoteMenu(b, false) : prefixLines(() => '> ', /^[ \t]*>[ \t]?/)),
+    color: (b) => b && colorPicker(b, false),
     codeblock: () => {
       const sel = ta.value.slice(ta.selectionStart, ta.selectionEnd) || 'code';
       if (ta.selectionStart !== ta.selectionEnd) return replaceRange(ta.selectionStart, ta.selectionEnd, '```\n' + sel + '\n```', ta.selectionStart + 4 + sel.length + 4);
@@ -1047,7 +1522,7 @@
       const alt = ta.value.slice(s, e) || 'mô tả ảnh';
       replaceRange(s, e, `![${alt}](duong-dan-anh.png)`, s + alt.length + 4, s + alt.length + 22);
     },
-    table: () => insertBlock('| Cột 1 | Cột 2 | Cột 3 |\n| --- | --- | --- |\n| A | B | C |\n| D | E | F |', null, [2, 7]),
+    table: (b) => (b ? tablePicker(b, false) : insertTable(3, 3, false)),
     hr: () => insertBlock('---'),
   };
 
@@ -1501,7 +1976,11 @@
     const doc = name === 'doc';
     const other = name !== 'diagram'; // whiteboard bị che
     if (other) E.commitText && E.commitText();
-    if (!doc) flushVisual();
+    if (!doc) {
+      flushVisual();
+      closeFmtPop();
+      hideTableBar();
+    }
     if (was === 'design' && name !== 'design' && DE.pages) DE.pages.onHide();
     if (was === 'settings' && name !== 'settings' && DE.settings) DE.settings.onHide();
     document.body.classList.toggle('ws-doc', doc);
@@ -1557,7 +2036,9 @@
     if (!['code', 'split', 'visual'].includes(v)) v = 'split';
     if (!dev) v = 'visual';
     flushVisual();
+    closeFmtPop();
     view = v;
+    scheduleTableBar();
     body.className = 'doc-body view-' + v;
     $$('.doc-view-switch [data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
     if (persist && dev) lsSet(VIEW_KEY, v);
@@ -1722,7 +2203,8 @@
       if (b.dataset.fmt) {
         const visual = view === 'visual' || (view === 'split' && lastFocus !== 'ta');
         const fn = (visual ? VFORMATS : FORMATS)[b.dataset.fmt];
-        if (fn) fn();
+        if (!fmtPop || fmtPop.dataset.for !== b.dataset.fmt) closeFmtPop();
+        if (fn) fn(b);
       } else if (b.dataset.view) setView(b.dataset.view);
       else if (b.dataset.doc) DOC_ACTIONS[b.dataset.doc] && DOC_ACTIONS[b.dataset.doc]();
     });
@@ -1767,7 +2249,10 @@
         lastRange = s.getRangeAt(0).cloneRange();
         lastFocus = 'visual';
       }
+      // thanh sửa bảng: hiện khi con trỏ trong bảng; giữ nguyên khi đang gõ số trong bảng chọn
+      if (!fmtPop || !fmtPop.contains(document.activeElement)) scheduleTableBar();
     });
+    window.addEventListener('resize', scheduleTableBar);
     // ô tick của task list: tự đảo trạng thái (checkbox trong contenteditable không ổn định giữa các trình duyệt)
     pv.addEventListener('mousedown', (e) => {
       const cb = e.target.closest('input.md-task');
@@ -1788,7 +2273,14 @@
     window.addEventListener('pagehide', flushAll);
     document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flushAll());
     ta.addEventListener('scroll', () => requestAnimationFrame(syncFromEditor), { passive: true });
-    pvWrap.addEventListener('scroll', () => requestAnimationFrame(syncFromPreview), { passive: true });
+    pvWrap.addEventListener(
+      'scroll',
+      () => {
+        requestAnimationFrame(syncFromPreview);
+        scheduleTableBar();
+      },
+      { passive: true }
+    );
     new ResizeObserver(() => (linesDirty = anchorsDirty = true)).observe(body);
     pv.addEventListener('load', () => (anchorsDirty = true), true); // ảnh tải xong đổi chiều cao
 
@@ -2218,7 +2710,7 @@
 .md-preview pre{background:var(--md-pre-bg,#f6f8fa);padding:14px 16px;border-radius:8px;overflow:auto;line-height:1.45}
 .md-preview pre code{background:none;padding:0;font-size:.85em;white-space:pre}
 .md-preview blockquote{padding:0 1em;color:var(--md-muted,#59636e);border-left:.25em solid var(--md-border,#d1d9e0)}
-.md-preview hr{height:.25em;padding:0;margin:1.5em 0;background:var(--md-border,#d1d9e0);border:0}
+.md-preview hr{height:0;padding:0;margin:1.5em 1cm;border:0;border-top:2px solid var(--md-border,#d1d9e0)}
 .md-preview .md-table{overflow:auto}.md-preview table{border-collapse:collapse;width:max-content;max-width:100%}
 .md-preview th,.md-preview td{padding:6px 13px;border:1px solid var(--md-border,#d1d9e0)}.md-preview th{font-weight:600;background:var(--md-pre-bg,#f6f8fa)}
 .md-preview img{max-width:100%;height:auto}.md-preview mark{background:#fff8c5;color:inherit;padding:0 .1em}
