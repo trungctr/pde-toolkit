@@ -87,7 +87,7 @@
     const T = TYPES[n.type];
     if (n.name) return n.name;
     const P = n.props || {};
-    let s = n.type === 'menu' ? P.menuName || 'Menu' : P.text || P.label || (n.type === 'image' ? P.alt : '') || '';
+    let s = n.type === 'menu' ? P.menuName || 'Menu' : PK.plain(P.text) || P.label || (n.type === 'image' ? P.alt : '') || '';
     if (n.type === 'divider') return { hr: 'Thanh ngang', vr: 'Thanh dọc', space: 'Khoảng trống' }[P.kind || 'hr'];
     if (n.type === 'button' && !s && P.icon) s = P.icon;
     s = String(s).replace(/\s+/g, ' ').trim();
@@ -191,7 +191,7 @@
     fdoc.open();
     fdoc.write(
       '<!doctype html><html lang="vi"><head><meta charset="utf-8">' +
-        `<style>${PK.BASE_CSS}\n${PK.EDIT_CSS}</style><style id="pg-theme"></style><style id="pg-css"></style><link id="pg-fonts" rel="stylesheet">` +
+        `<style id="pg-fonts"></style><style>${PK.BASE_CSS}\n${PK.EDIT_CSS}</style><style id="pg-theme"></style><style id="pg-css"></style>` +
         '</head><body class="pg-edit"><div id="pg-root" class="pg-page"></div></body></html>'
     );
     fdoc.close();
@@ -219,14 +219,13 @@
     const open = st.sel ? openMenusFor(st.sel) : [];
     openKey = open.join();
     const out = PK.renderPage(S.proj, page, { edit: true, openMenus: new Set(open) });
-    fdoc.getElementById('pg-theme').textContent = PK.themeCSS(S.proj.theme);
+    fdoc.getElementById('pg-theme').textContent = PK.themeCSS(S.proj.theme, S.proj);
     fdoc.getElementById('pg-css').textContent = out.css;
-    const url = PK.fontsURL(out.fonts);
-    const link = fdoc.getElementById('pg-fonts');
-    if ((link.getAttribute('href') || '') !== url) {
-      if (url) link.setAttribute('href', url);
-      else link.removeAttribute('href');
-    }
+    // font: Google Fonts (@import) + font riêng tải lên (@font-face); chỉ ghi lại khi đổi để không tải lại
+    const fa = PK.fontAssets(S.proj, out.fonts);
+    const fcss = fa.links.map((u) => `@import url(${JSON.stringify(u)});`).join('\n') + '\n' + fa.css;
+    const fst = fdoc.getElementById('pg-fonts');
+    if (fst.textContent !== fcss) fst.textContent = fcss;
     froot.className = 'pg-page ' + page.id;
     froot.innerHTML = out.html || '<div class="pg-ed-empty">Trang trống – kéo thành phần từ thư viện bên trái vào đây,<br>hoặc bấm vào một thành phần để thêm vào trang.</div>';
     fdoc.body.classList.toggle('pg-outline', st.outline);
@@ -327,6 +326,9 @@
       const p = toFrame(e.clientX, e.clientY);
       const id = hit(p.x, p.y);
       select(id);
+      const n = id ? nodeOf(id) : null;
+      // thành phần đặt tự do: kéo để đổi vị trí (đổi chỗ trong cây bằng nút ✥ trên nhãn)
+      if (n && TYPES[n.type].keys.has('pos') && /^(absolute|fixed)$/.test(PK.resolve(n, theme()).pos)) return beginNudge(e, id);
       if (id) beginDrag({ kind: 'move', id, x0: e.clientX, y0: e.clientY });
     });
     overlay.addEventListener('click', (e) => {
@@ -349,6 +351,44 @@
     overlay.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
+  /** Kéo thành phần đặt tự do: cập nhật khoảng cách tới mép (giữ mép đang dùng: trái/phải, trên/dưới) */
+  function beginNudge(e, id) {
+    const el = elOf(id), n = nodeOf(id);
+    if (!el || !n) return;
+    const P = PK.resolve(n, theme());
+    const cs = fdoc.defaultView.getComputedStyle(el);
+    const useR = P.posRight != null && P.posRight !== '' && (P.posLeft == null || P.posLeft === '');
+    const useB = P.posBottom != null && P.posBottom !== '' && (P.posTop == null || P.posTop === '');
+    const sx = parseFloat(useR ? cs.right : cs.left) || 0, sy = parseFloat(useB ? cs.bottom : cs.top) || 0;
+    const x0 = e.clientX, y0 = e.clientY;
+    let last = null;
+    const move = (ev) => {
+      const dx = (ev.clientX - x0) / view.s, dy = (ev.clientY - y0) / view.s;
+      if (!last && Math.hypot(dx, dy) < 3) return;
+      ev.preventDefault();
+      last = [Math.round(useR ? sx - dx : sx + dx), Math.round(useB ? sy - dy : sy + dy)];
+      el.style[useR ? 'right' : 'left'] = last[0] + 'px';
+      el.style[useB ? 'bottom' : 'top'] = last[1] + 'px';
+      drawOverlay();
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      if (!last) return;
+      commit((proj) => {
+        const x = PK.find(proj, id);
+        if (!x) return;
+        const p = x.node.props;
+        p[useR ? 'posRight' : 'posLeft'] = last[0];
+        p[useB ? 'posBottom' : 'posTop'] = last[1];
+      });
+      renderInspector();
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  }
   function toFrame(cx, cy) {
     const r = stage.getBoundingClientRect();
     return { x: (cx - r.left) / view.s, y: (cy - r.top) / view.s };
@@ -388,6 +428,7 @@
     if (placeBox(hb, hv)) $('.pgo-tag', hb).textContent = shortName(nodeOf(st.hover));
     const r = placeBox($('.pgo-sel', overlay), st.sel ? elOf(st.sel) : null);
     const chip = $('.pgo-chip', overlay);
+    if (st.editing) placeFmtBar();
     if (!r || st.editing || st.drag) {
       chip.hidden = true;
       return;
@@ -760,7 +801,7 @@
       return (e && e.closest(sel)) || null;
     };
     let el = null, extra = null;
-    if (n.type === 'heading' || n.type === 'text') el = host;
+    if (n.type === 'heading' || n.type === 'text' || n.type === 'shape') el = host;
     else if (n.type === 'button') el = host.querySelector('.pg-btn-text');
     else if (n.type === 'list') {
       el = opt.li != null ? host.querySelector(`li[data-li="${opt.li}"]`) : at('li[data-li]') || host.querySelector('li[data-li]');
@@ -770,11 +811,19 @@
       if (el) extra = el.dataset.cell.split(',').map(Number);
     } else if (['input', 'select', 'checkbox'].includes(n.type)) el = host.querySelector('.pg-label-text');
     if (!el) return false;
-    st.editing = { id, el, kind: n.type, extra, orig: el.innerText };
+    // chữ có định dạng (đậm, nghiêng, liên kết…): sửa kiểu "rich", lưu lại thành cú pháp chữ định dạng
+    const rich = RICH_KINDS.has(n.type);
+    const P = PK.resolve(n, theme());
+    let orig = el.innerText;
+    if (rich) orig = n.type === 'list' ? (P.items || [])[extra] : n.type === 'table' ? ((P.rows || [])[extra[0]] || [])[extra[1]] : P.text;
+    st.editing = { id, el, kind: n.type, extra, orig: orig == null ? '' : String(orig), rich, hold: false };
     overlay.classList.add('editing');
     drawOverlay();
-    el.setAttribute('contenteditable', 'plaintext-only');
-    if (!el.isContentEditable) el.setAttribute('contenteditable', 'true');
+    if (rich) el.setAttribute('contenteditable', 'true');
+    else {
+      el.setAttribute('contenteditable', 'plaintext-only');
+      if (!el.isContentEditable) el.setAttribute('contenteditable', 'true');
+    }
     el.focus({ preventScroll: true });
     try {
       const r = fdoc.createRange();
@@ -787,10 +836,153 @@
     }
     el.addEventListener('keydown', onEditKey);
     el.addEventListener('blur', onEditBlur);
+    if (rich) {
+      el.addEventListener('paste', onEditPaste);
+      try {
+        fdoc.execCommand('styleWithCSS', false, true);
+      } catch (_) {
+        /* trình duyệt cũ */
+      }
+      showFmtBar();
+    }
     return true;
   }
+  const RICH_KINDS = new Set(['heading', 'text', 'list', 'table', 'shape']);
   function onEditBlur() {
+    if (st.editing && st.editing.hold) return; // đang nhập địa chỉ liên kết / chọn màu trên thanh định dạng
     finishEdit(true);
+  }
+  /** Dán: giữ đậm / nghiêng / liên kết / màu từ trang khác, bỏ mọi thứ còn lại */
+  function onEditPaste(e) {
+    const ed = st.editing;
+    if (!ed || !ed.rich || !e.clipboardData) return;
+    e.preventDefault();
+    const html = e.clipboardData.getData('text/html'), txt = e.clipboardData.getData('text/plain');
+    let md = html ? PK.domToInline(new DOMParser().parseFromString(html, 'text/html').body) : PK.escInline(txt);
+    if (ed.kind === 'list') md = md.replace(/\n+/g, ' ');
+    fdoc.execCommand('insertHTML', false, PK.inline(md, { edit: true, proj: S.proj }));
+  }
+  // ---- thanh định dạng nổi khi sửa chữ trên trang
+  let fmtBar = null, fmtRange = null;
+  const FMT = [
+    ['bold', '<b>B</b>', 'Đậm (Ctrl+B)'],
+    ['italic', '<i>I</i>', 'Nghiêng (Ctrl+I)'],
+    ['underline', '<u>U</u>', 'Gạch chân (Ctrl+U)'],
+    ['strikeThrough', '<s>S</s>', 'Gạch ngang'],
+    ['link', '🔗', 'Liên kết (Ctrl+K)'],
+    ['color', '<span class="pgo-fmt-a">A</span>', 'Màu chữ'],
+    ['removeFormat', '⌫', 'Bỏ định dạng'],
+  ];
+  function showFmtBar() {
+    const ed = st.editing;
+    if (!ed) return;
+    if (!fmtBar) {
+      fmtBar = document.createElement('div');
+      fmtBar.className = 'pgo-fmt';
+      fmtBar.innerHTML =
+        FMT.map(([c, ic, t]) => `<button type="button" data-fmt="${c}" title="${t}">${ic}</button>`).join('') +
+        '<input type="color" class="pgo-fmt-color" tabindex="-1" aria-label="Màu chữ"><span class="pgo-fmt-link" hidden><input type="url" placeholder="https://… hoặc #ma-neo" spellcheck="false"><button type="button" data-fmt="link-ok">OK</button></span>';
+      // giữ con trỏ trong khung trang khi bấm nút (không làm mất vùng chọn)
+      fmtBar.addEventListener('mousedown', (e) => {
+        if (!e.target.closest('input')) e.preventDefault();
+      });
+      fmtBar.addEventListener('click', onFmtClick);
+      const color = fmtBar.querySelector('.pgo-fmt-color');
+      color.addEventListener('input', () => {
+        restoreRange();
+        fdoc.execCommand('foreColor', false, color.value);
+      });
+      color.addEventListener('change', () => endHold());
+      const li = fmtBar.querySelector('.pgo-fmt-link input');
+      li.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          applyLink(li.value);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          endHold();
+        }
+      });
+      overlay.appendChild(fmtBar);
+    }
+    fmtBar.querySelector('.pgo-fmt-link').hidden = true;
+    fmtBar.hidden = false;
+    placeFmtBar();
+  }
+  function placeFmtBar() {
+    const ed = st.editing;
+    if (!fmtBar || !ed) return;
+    const r = rectIn(ed.el);
+    const h = fmtBar.offsetHeight || 30;
+    fmtBar.style.left = Math.max(0, Math.min(r.x, overlay.clientWidth - fmtBar.offsetWidth)) + 'px';
+    fmtBar.style.top = (r.y - h - 8 >= 0 ? r.y - h - 8 : r.y + r.h + 8) + 'px';
+  }
+  function hideFmtBar() {
+    if (fmtBar) fmtBar.hidden = true;
+  }
+  function saveRange() {
+    try {
+      const s = fdoc.getSelection();
+      fmtRange = s.rangeCount ? s.getRangeAt(0).cloneRange() : null;
+    } catch (_) {
+      fmtRange = null;
+    }
+  }
+  function restoreRange() {
+    const ed = st.editing;
+    if (!ed) return;
+    ed.el.focus({ preventScroll: true });
+    if (!fmtRange) return;
+    const s = fdoc.getSelection();
+    s.removeAllRanges();
+    s.addRange(fmtRange);
+  }
+  function endHold() {
+    const ed = st.editing;
+    if (!ed) return;
+    restoreRange();
+    ed.hold = false;
+    if (fmtBar) fmtBar.querySelector('.pgo-fmt-link').hidden = true;
+  }
+  function applyLink(url) {
+    restoreRange();
+    const u = PK.safeUrl((url || '').trim());
+    if (u) fdoc.execCommand('createLink', false, u);
+    else if (url && url.trim()) toast('Địa chỉ không hợp lệ hoặc không an toàn', 'warn');
+    endHold();
+  }
+  function askLink() {
+    const ed = st.editing;
+    if (!ed || !fmtBar) return;
+    saveRange();
+    ed.hold = true;
+    const box = fmtBar.querySelector('.pgo-fmt-link');
+    box.hidden = false;
+    const inp = box.querySelector('input');
+    const a = fmtRange && fmtRange.startContainer && (fmtRange.startContainer.nodeType === 1 ? fmtRange.startContainer : fmtRange.startContainer.parentElement);
+    const cur = a && a.closest ? a.closest('a') : null;
+    inp.value = cur ? cur.getAttribute('data-href') || cur.getAttribute('href') || '' : '';
+    placeFmtBar();
+    inp.focus();
+    inp.select();
+  }
+  function onFmtClick(e) {
+    const b = e.target.closest('[data-fmt]');
+    const ed = st.editing;
+    if (!b || !ed) return;
+    const c = b.dataset.fmt;
+    if (c === 'link') return askLink();
+    if (c === 'link-ok') return applyLink(fmtBar.querySelector('.pgo-fmt-link input').value);
+    if (c === 'color') {
+      saveRange();
+      ed.hold = true;
+      fmtBar.querySelector('.pgo-fmt-color').click();
+      // hộp chọn màu đóng mà không đổi màu: trả lại trạng thái sửa sau một lúc
+      setTimeout(() => window.addEventListener('focus', () => ed.hold && endHold(), { once: true }), 0);
+      return;
+    }
+    fdoc.execCommand(c);
   }
   function onEditKey(e) {
     const ed = st.editing;
@@ -801,9 +993,30 @@
       finishEdit(false);
       return;
     }
+    if (ed.rich && (e.ctrlKey || e.metaKey) && !e.altKey) {
+      const k = e.key.toLowerCase();
+      const cmd = { b: 'bold', i: 'italic', u: 'underline' }[k];
+      if (cmd) {
+        e.preventDefault();
+        fdoc.execCommand(cmd);
+        return;
+      }
+      if (k === 'k') {
+        e.preventDefault();
+        askLink();
+        return;
+      }
+    }
     if (e.key === 'Enter') {
-      if (ed.kind === 'text' && !(e.ctrlKey || e.metaKey)) return; // đoạn văn: Enter = xuống dòng
-      if (ed.kind === 'heading' && e.shiftKey) return;
+      // xuống dòng trong chữ: thẻ <br> (không tạo khối <div>)
+      const br = (ed.kind === 'text' || ed.kind === 'shape') && !(e.ctrlKey || e.metaKey);
+      if (br || (ed.kind === 'heading' && e.shiftKey)) {
+        if (ed.rich) {
+          e.preventDefault();
+          fdoc.execCommand('insertLineBreak');
+        }
+        return;
+      }
       e.preventDefault();
       const { id, kind, extra } = ed;
       finishEdit(true);
@@ -842,7 +1055,10 @@
     st.editing = null;
     ed.el.removeEventListener('keydown', onEditKey);
     ed.el.removeEventListener('blur', onEditBlur);
-    const v = ed.el.innerText.replace(/ /g, ' ').replace(/\n$/, '');
+    ed.el.removeEventListener('paste', onEditPaste);
+    hideFmtBar();
+    const plainV = ed.el.innerText.replace(/ /g, ' ').replace(/\n$/, '');
+    const v = ed.rich ? PK.domToInline(ed.el) : plainV;
     ed.el.removeAttribute('contenteditable');
     overlay.classList.remove('editing');
     try {
@@ -857,7 +1073,7 @@
         if (!f) return;
         const n = f.node, P = n.props;
         const full = PK.resolve(n, theme());
-        if (ed.kind === 'heading' || ed.kind === 'text') P.text = v.slice(0, 20000);
+        if (ed.kind === 'heading' || ed.kind === 'text' || ed.kind === 'shape') P.text = v.slice(0, 20000);
         else if (ed.kind === 'button') P.text = one.slice(0, 300);
         else if (ed.kind === 'list') {
           const items = full.items.slice();
@@ -954,6 +1170,89 @@
     return /rgba\([^)]*,\s*0\)/.test(v) || v === 'transparent' ? '#ffffff' : hexOf(v);
   }
 
+  // ---- chữ định dạng: thanh nút bọc vùng chữ đang chọn bằng ký hiệu
+  const RICH_HINT = '<small class="pg-hint">Chọn chữ rồi bấm nút, hoặc gõ: <code>**đậm**</code> <code>_nghiêng_</code> <code>[chữ](https://…)</code> <code>[chữ]{#e11d48}</code> · nhấn đúp trên trang để sửa trực tiếp</small>';
+  const RT = [
+    ['**', '**', '<b>B</b>', 'Đậm'],
+    ['_', '_', '<i>I</i>', 'Nghiêng'],
+    ['++', '++', '<u>U</u>', 'Gạch chân'],
+    ['~~', '~~', '<s>S</s>', 'Gạch ngang'],
+    ['==', '==', '<mark>M</mark>', 'Tô sáng'],
+    ['[', '](https://)', '🔗', 'Liên kết'],
+  ];
+  const richBar = (fk) =>
+    `<div class="pg-rt" data-rt="${fk}">` +
+    RT.map(([l, r, ic, t], i) => `<button type="button" data-rtw="${i}" title="${t}">${ic}</button>`).join('') +
+    `<label class="pg-rt-color" title="Màu chữ cho đoạn đang chọn"><span>A</span><input type="color" data-rtc="${fk}" value="#e11d48"></label></div>`;
+  /** Bọc vùng chọn trong ô nhập bằng ký hiệu, rồi lưu */
+  function wrapSel(ta, l, r, selectInner) {
+    const a = ta.selectionStart, b = ta.selectionEnd;
+    const v = ta.value;
+    let s = v.slice(a, b);
+    const lead = s.match(/^\s*/)[0], tail = s.match(/\s*$/)[0];
+    s = s.trim() || 'chữ';
+    ta.value = v.slice(0, a) + lead + l + s + r + tail + v.slice(b);
+    ta.focus();
+    if (selectInner === 'url') {
+      const p = a + lead.length + l.length + s.length + 2;
+      ta.setSelectionRange(p, p + 8);
+    } else ta.setSelectionRange(a + lead.length + l.length, a + lead.length + l.length + s.length);
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  // ---- màu chuyển sắc
+  const GRAD_DEF = { kind: 'linear', angle: 135, stops: [{ c: '#6366f1', p: 0 }, { c: '#ec4899', p: 100 }] };
+  const AT_NAMES = { center: 'Giữa', top: 'Trên', bottom: 'Dưới', left: 'Trái', right: 'Phải', 'top left': 'Trên trái', 'top right': 'Trên phải', 'bottom left': 'Dưới trái', 'bottom right': 'Dưới phải' };
+  function gradEditor(fk, f, g, lab, hint) {
+    if (!g) return `<div class="f pg-f">${lab}<div class="btn-row"><button type="button" class="btn" data-gradon="${fk}">＋ Thêm màu chuyển sắc</button></div>${hint}</div>`;
+    const seg = (key, opts, cur) => `<div class="pg-seg">${opts.map(([v, l]) => `<button type="button" class="${cur === v ? 'on' : ''}" data-gset="${fk}" data-gkey="${key}" data-v="${v}">${l}</button>`).join('')}</div>`;
+    let h = `<div class="f pg-f">${lab}<div class="pg-grad"><div class="pg-grad-prev" style="background-image:${esc(PK.gradCss(g))}"></div>`;
+    h += seg('kind', [['linear', 'Thẳng'], ['radial', 'Toả tròn'], ['conic', 'Xoay vòng']], g.kind);
+    if (g.kind !== 'radial') h += `<div class="pg-range"><span class="pg-unit">Góc</span><input type="range" min="0" max="360" step="1" value="${g.angle || 0}" data-grada="${fk}"><input type="number" min="-360" max="720" value="${g.angle || 0}" data-grada="${fk}"><span class="pg-unit">°</span></div>`;
+    if (g.kind === 'radial') h += seg('shape', [['ellipse', 'Bầu dục'], ['circle', 'Tròn']], g.shape || 'ellipse');
+    if (g.kind !== 'linear') h += `<label class="pg-grad-at"><span class="pg-unit">Tâm</span><select data-gradat="${fk}">${PK.GRAD_AT.map((a) => `<option value="${a}"${(g.at || 'center') === a ? ' selected' : ''}>${AT_NAMES[a]}</option>`).join('')}</select></label>`;
+    h += '<div class="pg-grad-stops">';
+    g.stops.forEach((s, i) => {
+      h +=
+        `<div class="pg-grad-stop"><input type="color" value="${hexOf(s.c)}" data-gradc="${fk}" data-i="${i}" title="Màu">` +
+        `<input type="text" class="pg-hex" value="${esc(s.c)}" data-gradh="${fk}" data-i="${i}" spellcheck="false" aria-label="Mã màu (có thể dùng rgba để trong suốt)">` +
+        `<input type="number" min="0" max="100" value="${s.p == null ? '' : s.p}" placeholder="tự" data-gradp="${fk}" data-i="${i}" title="Vị trí (%)"><span class="pg-unit">%</span>` +
+        (g.stops.length > 2 ? `<button type="button" class="pg-mini" data-gradx="${fk}" data-i="${i}" title="Bỏ điểm màu này">×</button>` : '') +
+        '</div>';
+    });
+    h += `</div><div class="btn-row"><button type="button" class="btn" data-gradadd="${fk}">＋ Điểm màu</button><button type="button" class="btn" data-gradoff="${fk}">Bỏ chuyển sắc</button></div></div>${hint}</div>`;
+    return h;
+  }
+  /** Đọc gradient hiện tại của trường fk (đã gộp mặc định) */
+  function gradOf(fk) {
+    const [scope, k] = splitKey(fk);
+    if (scope !== 'node') return null;
+    const n = nodeOf(st.sel);
+    return n ? DE.clone(PK.resolve(n, theme())[k] || null) : null;
+  }
+  function setGrad(fk, fn, merge) {
+    const g = gradOf(fk) || DE.clone(GRAD_DEF);
+    fn(g);
+    if (!setValue(fk, g, merge)) toast('Màu không hợp lệ – dùng dạng #6366f1 hoặc rgba(99,102,241,.5)', 'warn');
+  }
+  // ---- khung hình chuyển động tuỳ chỉnh
+  const FR_COLS = [['at', 'Mốc %', 0, 100], ['opacity', 'Rõ %', 0, 100], ['x', 'Ngang px', -2000, 2000], ['y', 'Dọc px', -2000, 2000], ['scale', 'Cỡ %', 0, 500], ['rotate', 'Xoay °', -720, 720]];
+  function framesEditor(fk, v) {
+    const fr = Array.isArray(v) && v.length ? v : [{ at: 0, opacity: 0, y: 30 }, { at: 100, opacity: 100, y: 0 }];
+    let h = '<div class="f pg-f"><span class="pg-lab">Khung hình (mỗi dòng là một thời điểm)</span><div class="pg-tbl-wrap"><table class="pg-tbl pg-frames"><tr>' + FR_COLS.map((c) => `<th>${c[1]}</th>`).join('') + '<th></th></tr>';
+    fr.forEach((f, i) => {
+      h += '<tr>' + FR_COLS.map(([k, , a, b]) => `<td><input type="number" min="${a}" max="${b}" value="${f[k] == null ? '' : f[k]}" data-frame="${fk}" data-i="${i}" data-fk="${k}"></td>`).join('') + `<td class="pg-tbl-x">${fr.length > 2 ? `<button type="button" data-framex="${fk}" data-i="${i}" title="Bỏ khung này">×</button>` : ''}</td></tr>`;
+    });
+    return h + `</table></div><div class="btn-row"><button type="button" class="btn" data-frameadd="${fk}">＋ Khung hình</button></div><small class="pg-hint">Ô để trống = giữ như bình thường. Ví dụ hiện dần từ dưới lên: 0% rõ 0, dọc 30 → 100% rõ 100, dọc 0.</small></div>`;
+  }
+  function setFrames(fk, fn, merge) {
+    const n = nodeOf(st.sel);
+    if (!n) return;
+    const cur = PK.resolve(n, theme()).animFrames;
+    const fr = DE.clone(Array.isArray(cur) && cur.length ? cur : [{ at: 0, opacity: 0, y: 30 }, { at: 100, opacity: 100, y: 0 }]);
+    fn(fr);
+    setValue(fk, fr, merge);
+  }
+
   /** Một trường. ctx: { type, P, own(k), c (vị trí), color(k) } */
   function fieldHTML(fk, f, v, ctx) {
     const k = splitKey(fk)[1];
@@ -1001,9 +1300,32 @@
         return `<div class="pg-bool-row"><label class="pg-bool"><input type="checkbox" data-k="${fk}"${v ? ' checked' : ''}><span>${esc(f.label)}</span></label>${reset}</div>${hint}`;
       case 'area':
         if (f.uiFor && f.uiFor[ctx.type] === 'text') return `<label class="f pg-f">${lab}<input type="text" data-k="${fk}" value="${esc(v)}" maxlength="300">${hint}</label>`;
-        return `<label class="f pg-f">${lab}<textarea data-k="${fk}" rows="${Math.min(12, Math.max(f.rows || 3, String(v || '').split('\n').length + 1))}"${k === 'script' ? ' class="code" spellcheck="false"' : ''}${ph}>${esc(v)}</textarea>${hint}</label>`;
+        return `<div class="f pg-f">${lab}${f.rich ? richBar(fk) : ''}<textarea data-k="${fk}" rows="${Math.min(12, Math.max(f.rows || 3, String(v || '').split('\n').length + 1))}"${k === 'script' ? ' class="code" spellcheck="false"' : ''}${ph}>${esc(v)}</textarea>${f.rich ? RICH_HINT : ''}${hint}</div>`;
       case 'lines':
-        return `<label class="f pg-f">${lab}<textarea data-k="${fk}" data-lines rows="${Math.min(12, Math.max(f.rows || 3, (v || []).length + 1))}">${esc((v || []).join('\n'))}</textarea>${hint}</label>`;
+        return `<div class="f pg-f">${lab}${f.rich ? richBar(fk) : ''}<textarea data-k="${fk}" data-lines rows="${Math.min(12, Math.max(f.rows || 3, (v || []).length + 1))}">${esc((v || []).join('\n'))}</textarea>${f.rich ? RICH_HINT : ''}${hint}</div>`;
+      case 'len': {
+        const s = v == null || v === '' ? '' : String(v);
+        const m = s.match(/^(-?[\d.]+)(px|%|vw|vh|em|rem)?$/);
+        const num = m ? m[1] : '', unit = m && m[2] ? m[2] : 'px';
+        const clear = s !== '' ? `<button type="button" class="pg-mini" data-lenclear="${fk}" title="Bỏ giá trị (tự động)">Tự động</button>` : '';
+        return (
+          `<div class="f pg-f">${lab}<div class="pg-len"><input type="number" data-len="${fk}" value="${esc(num)}" step="1" placeholder="tự động">` +
+          `<select data-lenu="${fk}" aria-label="Đơn vị">${['px', '%', 'vw', 'vh', 'em'].map((u) => `<option${u === unit ? ' selected' : ''}>${u}</option>`).join('')}</select>${clear}</div>${hint}</div>`
+        );
+      }
+      case 'gradient':
+        return gradEditor(fk, f, v, lab, hint);
+      case 'frames':
+        return framesEditor(fk, v);
+      case 'font': {
+        const opts = PK.fontOptions(S.proj, !f.noInherit);
+        const cur = v == null ? '' : String(v);
+        const missing = cur && !opts.some((o) => o[0] === cur) ? `<option value="${esc(cur)}" selected>(font đã bị xoá)</option>` : '';
+        return (
+          `<label class="f pg-f">${lab}<select data-k="${fk}">${missing}${opts.map(([val, l]) => `<option value="${esc(val)}"${cur === val ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>${hint}</label>` +
+          `<div class="btn-row pg-under"><button type="button" class="btn" data-act="fonts">Font riêng (Google Fonts, tải file)…</button></div>`
+        );
+      }
       case 'image': {
         const isData = /^data:/.test(v || '');
         const kb = isData ? Math.round((v.length * 3) / 4 / 1024) : 0;
@@ -1118,6 +1440,11 @@
               '</div></div>'
             );
           if (k === 'FX') return fxEditor(n, P) + fieldHTML('speed', PK.FIELDS.speed, P.speed, ctx);
+          if (k === 'ANIM')
+            return (
+              PK.ANIM_KEYS.map((x) => fieldHTML(x, PK.FIELDS[x], P[x], ctx)).join('') +
+              (P.anim && P.anim !== 'none' ? '<div class="btn-row"><button type="button" class="btn" data-act="anim-play">▶ Xem chuyển động trên trang</button></div><small class="pg-hint">Trong khung soạn, chuyển động chỉ chạy khi bấm nút trên; bấm “Xem thử” để xem như trang thật.</small>' : '')
+            );
           return fieldHTML(k, PK.FIELDS[k], P[k], ctx);
         })
         .join('');
@@ -1157,6 +1484,7 @@
       true
     );
     h += group('page:theme', 'Giao diện chung (áp dụng mọi trang)', Object.entries(PK.THEME_FIELDS).map(([k, f]) => fieldHTML('theme:' + k, f, th[k], tctx)).join(''), true);
+    h += group('page:fonts', `Font riêng của dự án${(S.proj.fonts || []).length ? ` (${S.proj.fonts.length})` : ''}`, fontsForm(), false);
     const all = S.proj.pages.reduce((a, p) => a + countNodes(p.children), 0);
     h += group(
       'page:proj',
@@ -1192,9 +1520,48 @@
   }
 
   // ---- sự kiện của bảng thuộc tính
+  /** Giá trị độ dài từ ô số + đơn vị */
+  function lenValue(fk) {
+    const box = $(`#pg-props [data-len="${CSS.escape(fk)}"]`);
+    const u = $(`#pg-props [data-lenu="${CSS.escape(fk)}"]`);
+    if (!box || box.value === '') return null;
+    const unit = u ? u.value : 'px';
+    return unit === 'px' ? Number(box.value) : box.value + unit;
+  }
   function onPropInput(e) {
     const t = e.target;
     if (t.dataset.cell) return setCell(t.dataset.cell, t.value);
+    if (t.dataset.len) {
+      const v = lenValue(t.dataset.len);
+      if (v != null) setValue(t.dataset.len, v, true);
+      return;
+    }
+    if (t.dataset.grada) {
+      const a = Number(t.value);
+      if (!isFinite(a)) return;
+      t.parentElement.querySelectorAll('[data-grada]').forEach((x) => x !== t && (x.value = a));
+      setGrad(t.dataset.grada, (g) => (g.angle = a), true);
+      return refreshGradPreview(t.dataset.grada);
+    }
+    if (t.dataset.gradc) {
+      setGrad(t.dataset.gradc, (g) => (g.stops[+t.dataset.i].c = t.value), true);
+      const hx = t.parentElement.querySelector('[data-gradh]');
+      if (hx) hx.value = t.value;
+      return refreshGradPreview(t.dataset.gradc);
+    }
+    if (t.dataset.gradp) {
+      if (t.value === '' || !isFinite(+t.value)) return;
+      setGrad(t.dataset.gradp, (g) => (g.stops[+t.dataset.i].p = +t.value), true);
+      return refreshGradPreview(t.dataset.gradp);
+    }
+    if (t.dataset.frame) {
+      const v = t.value === '' ? undefined : Number(t.value);
+      return setFrames(t.dataset.frame, (fr) => {
+        if (v === undefined && t.dataset.fk !== 'at') delete fr[+t.dataset.i][t.dataset.fk];
+        else if (v !== undefined) fr[+t.dataset.i][t.dataset.fk] = v;
+      }, 'frames');
+    }
+    if (t.dataset.gradh != null || t.dataset.rtc || t.dataset.gfam != null || t.dataset.font != null) return;
     if (t.dataset.hex != null || t.dataset.opt || t.dataset.name != null || t.id === 'pg-json') return;
     const fk = t.dataset.k;
     if (!fk || t.type === 'checkbox' || t.tagName === 'SELECT') return;
@@ -1210,9 +1577,38 @@
     if (scope === 'node' && PK.FX_KEYS.includes(k) && k !== 'speed') setFx(k.indexOf('press') === 0 ? 'press' : 'hover');
     setValue(fk, v, true);
   }
+  function refreshGradPreview(fk) {
+    const g = gradOf(fk);
+    const box = $(`#pg-props [data-gradoff="${CSS.escape(fk)}"]`);
+    const prev = box && box.closest('.pg-grad') && box.closest('.pg-grad').querySelector('.pg-grad-prev');
+    if (prev && g) prev.style.backgroundImage = PK.gradCss(g);
+  }
   function onPropChange(e) {
     const t = e.target;
-    if (t.dataset.cell || t.id === 'pg-json') return;
+    if (t.dataset.cell || t.id === 'pg-json' || t.dataset.len || t.dataset.grada || t.dataset.gradc || t.dataset.gradp || t.dataset.frame) {
+      if (t.dataset.len || t.dataset.grada || t.dataset.gradp || t.dataset.frame) renderInspector();
+      return;
+    }
+    if (t.dataset.lenu) {
+      const v = lenValue(t.dataset.lenu);
+      if (v != null) setValue(t.dataset.lenu, v);
+      return renderInspector();
+    }
+    if (t.dataset.gradat) {
+      setGrad(t.dataset.gradat, (g) => (g.at = t.value));
+      return renderInspector();
+    }
+    if (t.dataset.gradh) {
+      const v = t.value.trim();
+      setGrad(t.dataset.gradh, (g) => (g.stops[+t.dataset.i].c = v || '#000000'));
+      return renderInspector();
+    }
+    if (t.dataset.rtc) {
+      const ta = $(`#pg-props textarea[data-k="${CSS.escape(t.dataset.rtc)}"]`);
+      if (ta) wrapSel(ta, '[', `]{${t.value}}`);
+      return;
+    }
+    if (t.dataset.font != null || t.dataset.gfam != null) return;
     if (t.dataset.hex) {
       const v = t.value.trim();
       if (!v) resetValue(t.dataset.hex);
@@ -1238,6 +1634,63 @@
   function onPropClick(e) {
     const b = e.target.closest('button');
     if (!b || b.disabled) return;
+    const d = b.dataset;
+    if (d.rtw != null) {
+      const ta = b.closest('.f').querySelector('textarea[data-k]');
+      const [l, r] = RT[+d.rtw];
+      if (ta) wrapSel(ta, l, r, r.startsWith('](') ? 'url' : null);
+      return;
+    }
+    if (d.lenclear) {
+      const [scope, k] = splitKey(d.lenclear);
+      const f = fieldOf(scope, k);
+      if (f && f.opt) setValue(d.lenclear, null);
+      else resetValue(d.lenclear);
+      return renderInspector();
+    }
+    if (d.gradon) {
+      setValue(d.gradon, DE.clone(GRAD_DEF));
+      return renderInspector();
+    }
+    if (d.gradoff) {
+      resetValue(d.gradoff);
+      return renderInspector();
+    }
+    if (d.gset) {
+      setGrad(d.gset, (g) => {
+        g[d.gkey] = d.v;
+        if (d.gkey === 'kind' && d.v === 'radial') g.shape = g.shape || 'ellipse';
+      });
+      return renderInspector();
+    }
+    if (d.gradadd) {
+      setGrad(d.gradadd, (g) => {
+        const last = g.stops[g.stops.length - 1];
+        g.stops.push({ c: last ? last.c : '#ffffff', p: 100 });
+      });
+      return renderInspector();
+    }
+    if (d.gradx) {
+      setGrad(d.gradx, (g) => g.stops.splice(+d.i, 1));
+      return renderInspector();
+    }
+    if (d.frameadd) {
+      setFrames(d.frameadd, (fr) => {
+        const last = fr[fr.length - 1];
+        fr.push(Object.assign({}, last, { at: 100 }));
+        if (last && last.at === 100) last.at = 50;
+      });
+      return renderInspector();
+    }
+    if (d.framex) {
+      setFrames(d.framex, (fr) => fr.splice(+d.i, 1));
+      return renderInspector();
+    }
+    if (d.fontdel) return deleteFont(d.fontdel);
+    if (d.fontuse) {
+      setValue('theme:font', d.fontuse);
+      return renderInspector();
+    }
     if (b.dataset.seg) {
       setValue(b.dataset.seg, b.dataset.v);
       return renderInspector();
@@ -1302,7 +1755,7 @@
         return copySel();
       case 'reset-all': {
         if (!n) return;
-        const KEEP = ['text', 'level', 'items', 'rows', 'header', 'src', 'alt', 'label', 'placeholder', 'inputType', 'options', 'required', 'fieldName', 'checked', 'action', 'linkKind', 'page', 'url', 'newTab', 'menu', 'submitKind', 'func', 'message', 'menuName', 'mode', 'kind', 'tag', 'icon', 'iconPos', 'variant', 'size', 'method'];
+        const KEEP = ['text', 'level', 'items', 'rows', 'header', 'src', 'alt', 'label', 'placeholder', 'inputType', 'options', 'required', 'fieldName', 'checked', 'action', 'linkKind', 'page', 'url', 'newTab', 'menu', 'submitKind', 'func', 'message', 'menuName', 'mode', 'kind', 'tag', 'icon', 'iconPos', 'variant', 'size', 'method', 'anchorId'];
         commit((proj) => {
           const x = PK.find(proj, n.id).node;
           for (const k of Object.keys(x.props)) if (!KEEP.includes(k)) delete x.props[k];
@@ -1348,6 +1801,23 @@
         return tableOp((rows) => rows.forEach((r) => r.splice(+v, 1)));
       case 'table-paste':
         return pasteTableDialog();
+      case 'anim-play':
+        return playAnim(st.sel);
+      case 'fonts':
+        // quản lý font nằm ở bảng của trang (bỏ chọn thành phần)
+        st.groups['page:fonts'] = true;
+        select(null);
+        requestAnimationFrame(() => {
+          const g = $('#pg-props details[data-g="page:fonts"]');
+          if (g) g.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        });
+        return;
+      case 'font-google':
+        return addGoogleFont();
+      case 'font-upload':
+        return uploadFonts();
+      case 'font-url':
+        return addUrlFont();
       case 'page-dup':
         return duplicatePage();
       case 'page-move':
@@ -1371,6 +1841,151 @@
         return;
       }
     }
+  }
+
+  // ---- chuyển động: chạy thử một lần trong khung soạn
+  function playAnim(id) {
+    const el = elOf(id), n = nodeOf(id);
+    if (!el || !n) return;
+    const P = PK.resolve(n, theme());
+    el.classList.remove('pg-ed-play');
+    void el.offsetWidth;
+    el.classList.add('pg-ed-play');
+    clearTimeout(el._playT);
+    el._playT = setTimeout(() => {
+      el.classList.remove('pg-ed-play');
+      drawOverlay();
+    }, P.animLoop ? 4000 : (P.animDur || 700) + (P.animDelay || 0) + 300);
+  }
+
+  // ---- font riêng của dự án
+  const FAMILY_OK = /^[A-Za-z0-9][A-Za-z0-9 _.-]{0,59}$/;
+  function addFonts(list) {
+    if (!list.length) return;
+    commit((proj) => {
+      proj.fonts = proj.fonts || [];
+      for (const f of list) {
+        const i = proj.fonts.findIndex((x) => x.id === f.id);
+        if (i >= 0) {
+          // cùng họ font: gộp thêm file / độ đậm
+          const cur = proj.fonts[i];
+          if (f.faces) cur.faces = (cur.faces || []).concat(f.faces).slice(0, 18);
+          if (f.google) cur.google = f.google;
+        } else proj.fonts.push(f);
+      }
+    });
+    renderInspector();
+  }
+  function addGoogleFont() {
+    const fam = ($('#pg-props [data-gfam]') || {}).value || '';
+    const family = fam.trim().replace(/\s+/g, ' ');
+    if (!FAMILY_OK.test(family)) return toast('Nhập đúng tên font trên Google Fonts, vd Poppins hoặc Open Sans', 'warn');
+    const ws = (($('#pg-props [data-gw]') || {}).value || '')
+      .split(/[\s,;]+/)
+      .map(Number)
+      .filter((w) => w >= 100 && w <= 900 && w % 100 === 0);
+    addFonts([{ id: PK.fontId(family), name: family, family, google: { weights: [...new Set(ws)].sort((a, b) => a - b), italic: false } }]);
+    toast(`Đã thêm font “${family}” – chọn nó ở “Font chữ” của thành phần hoặc của cả trang`, 'ok');
+  }
+  const FONT_MIME = { woff2: 'font/woff2', woff: 'font/woff', ttf: 'font/ttf', otf: 'font/otf' };
+  const WEIGHT_WORDS = [[/thin|hairline/, '100'], [/extra-?light|ultra-?light/, '200'], [/light/, '300'], [/medium/, '500'], [/semi-?bold|demi-?bold/, '600'], [/extra-?bold|ultra-?bold/, '800'], [/black|heavy/, '900'], [/bold/, '700']];
+  async function uploadFonts() {
+    const files = await new Promise((resolve) => {
+      const inp = document.createElement('input');
+      inp.type = 'file';
+      inp.multiple = true;
+      inp.accept = '.woff2,.woff,.ttf,.otf';
+      inp.hidden = true;
+      inp.addEventListener('change', () => {
+        resolve([...inp.files]);
+        inp.remove();
+      });
+      document.body.appendChild(inp);
+      inp.click();
+    });
+    if (!files.length) return;
+    const typed = (($('#pg-props [data-ffam]') || {}).value || '').trim();
+    const byFam = new Map();
+    for (const f of files) {
+      const ext = (f.name.match(/\.([a-z0-9]+)$/i) || [])[1] || '';
+      const mime = FONT_MIME[ext.toLowerCase()];
+      if (!mime) {
+        toast(`“${f.name}” không phải file font (.woff2, .woff, .ttf, .otf)`, 'warn');
+        continue;
+      }
+      if (f.size > 4e6) {
+        toast(`“${f.name}” quá lớn (trên 4 MB)`, 'warn');
+        continue;
+      }
+      const base = f.name.replace(/\.[^.]+$/, '');
+      const low = base.toLowerCase();
+      // "Poppins-SemiBoldItalic" -> họ "Poppins", độ đậm 600, nghiêng
+      const family = typed || base.replace(/[-_ ]?(thin|hairline|extra-?light|ultra-?light|light|regular|normal|book|medium|semi-?bold|demi-?bold|extra-?bold|ultra-?bold|bold|black|heavy)?[-_ ]?(italic|oblique)?$/i, '').replace(/[-_]+/g, ' ').trim() || base;
+      if (!FAMILY_OK.test(family)) {
+        toast(`Tên font “${family}” có ký tự không dùng được – nhập tên font vào ô bên trên rồi tải lại`, 'warn');
+        continue;
+      }
+      const weight = (WEIGHT_WORDS.find(([re]) => re.test(low)) || [null, '400'])[1];
+      const style = /italic|oblique/.test(low) ? 'italic' : 'normal';
+      const src = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result).replace(/^data:[^;]*;/, `data:${mime};`));
+        r.onerror = () => rej(r.error);
+        r.readAsDataURL(f);
+      });
+      if (!byFam.has(family)) byFam.set(family, []);
+      byFam.get(family).push({ src, weight, style });
+    }
+    addFonts([...byFam].map(([family, faces]) => ({ id: PK.fontId(family), name: family, family, faces })));
+    if (byFam.size) toast(`Đã thêm ${byFam.size} font – file font nằm trong dự án nên file JSON / HTML sẽ nặng hơn`, 'ok');
+  }
+  function addUrlFont() {
+    const url = (($('#pg-props [data-furl]') || {}).value || '').trim();
+    const family = (($('#pg-props [data-ffam]') || {}).value || '').trim();
+    const src = PK.safeFont(url);
+    if (!src || !/^https?:/i.test(src)) return toast('Địa chỉ file font phải bắt đầu bằng https://', 'warn');
+    if (!FAMILY_OK.test(family)) return toast('Nhập tên font (chữ cái, số, khoảng trắng)', 'warn');
+    addFonts([{ id: PK.fontId(family), name: family, family, faces: [{ src, weight: '400', style: 'normal' }] }]);
+    toast(`Đã thêm font “${family}”`, 'ok');
+  }
+  function deleteFont(id) {
+    let used = 0;
+    PK.walkProject(S.proj, (n) => {
+      if (n.props.font === id) used++;
+    });
+    commit((proj) => {
+      proj.fonts = (proj.fonts || []).filter((f) => f.id !== id);
+      if (!proj.fonts.length) delete proj.fonts;
+      if (proj.theme.font === id) proj.theme.font = PK.THEME_DEF.font;
+      PK.walkProject(proj, (n) => {
+        if (n.props.font === id) delete n.props.font;
+      });
+    });
+    renderInspector();
+    toast(`Đã xoá font${used ? ` – ${used} thành phần đang dùng nó về font của trang` : ''} (Ctrl+Z để hoàn tác)`, 'info');
+  }
+  function fontsForm() {
+    const list = S.proj.fonts || [];
+    const th = theme();
+    let h = list.length
+      ? '<ul class="pg-fonts">' +
+        list
+          .map((f) => {
+            const src = f.google ? 'Google Fonts' + (f.google.weights.length ? ' · ' + f.google.weights.join(', ') : '') : `${(f.faces || []).length} file`;
+            return `<li><span style="font-family:${esc(PK.fontFamily(f.id, S.proj))}">${esc(f.name)}</span><small>${esc(src)}${th.font === f.id ? ' · đang dùng cho cả trang' : ''}</small>` +
+              (th.font !== f.id ? `<button type="button" class="pg-mini" data-fontuse="${f.id}" title="Dùng làm font chung của dự án">Dùng chung</button>` : '') +
+              `<button type="button" class="pg-mini" data-fontdel="${f.id}" title="Xoá font này">×</button></li>`;
+          })
+          .join('') +
+        '</ul>'
+      : '<p class="pg-hint">Chưa có font riêng. Thêm từ Google Fonts, tải file font, hoặc nhập trang HTML có font.</p>';
+    h +=
+      '<div class="pg-fontadd"><span class="pg-lab">Google Fonts</span><div class="pg-fontrow"><input type="text" data-gfam placeholder="Tên font, vd Poppins" spellcheck="false"><input type="text" data-gw placeholder="Độ đậm: 400 700" spellcheck="false"><button type="button" class="btn" data-act="font-google">Thêm</button></div>' +
+      '<small class="pg-hint">Độ đậm phải có trong font (xem trên fonts.google.com) – để trống = chỉ bản thường.</small></div>' +
+      '<div class="pg-fontadd"><span class="pg-lab">File font của bạn</span><div class="pg-fontrow"><input type="text" data-ffam placeholder="Tên font (tự đoán theo tên file nếu trống)" spellcheck="false"></div>' +
+      '<div class="pg-fontrow"><button type="button" class="btn" data-act="font-upload">Tải file .woff2 / .ttf…</button></div>' +
+      '<div class="pg-fontrow"><input type="url" data-furl placeholder="hoặc địa chỉ https://…/font.woff2" spellcheck="false"><button type="button" class="btn" data-act="font-url">Thêm</button></div></div>';
+    return h;
   }
 
   function applyJsonTab() {
@@ -2100,6 +2715,14 @@
     return r;
   };
   PG.html = () => PK.exportHTML(S.proj);
+  PG.currentPageId = () => (S.proj ? curPage().id : null);
+  /** Nhập trang HTML: thay dự án bằng obj (đã gộp sẵn), chuyển tới trang page – hoàn tác được */
+  PG.applyImport = (obj, page) => {
+    const r = PK.normalize(obj);
+    if (!active()) DE.docs.show('design');
+    load(r.proj, { page });
+    return r;
+  };
   /** API cho kiểm thử / DevTools */
   PG._ = { st, S, select, insertNodes, moveNode, computeDrop, toFrame, elOf, hit, startEdit, finishEdit, setValue, render, renderInspector, setDevice, switchPage, addPage, undo, redo, frame: () => frame };
 
@@ -2179,6 +2802,7 @@
       if (b.dataset.device) return setDevice(b.dataset.device);
       const A = {
         new: newProject, open: openFile, save: saveJSON, 'export-html': exportHTML, undo, redo,
+        'import-html': () => DE.pageImport && DE.pageImport.start(),
         duplicate, delete: remove, up: () => moveBy(-1), down: () => moveBy(1), parent: selectParent,
         outline: toggleOutline, preview: openPreview,
       };
@@ -2210,6 +2834,17 @@
     $$('.pg-left [data-ptab]').forEach((b) => b.addEventListener('click', () => setPtab(b.dataset.ptab)));
     $$('.pg-right [data-itab]').forEach((b) => b.addEventListener('click', () => setItab(b.dataset.itab)));
     window.addEventListener('keydown', onKey);
+    // đang nhập địa chỉ liên kết / chọn màu trên thanh định dạng mà bấm ra chỗ khác: lưu chữ đang sửa
+    window.addEventListener(
+      'pointerdown',
+      (e) => {
+        if (st.editing && st.editing.hold && fmtBar && !fmtBar.contains(e.target)) {
+          st.editing.hold = false;
+          finishEdit(true);
+        }
+      },
+      true
+    );
     new ResizeObserver(scheduleSync).observe(canvas);
 
     ready = true;

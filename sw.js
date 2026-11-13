@@ -6,7 +6,7 @@
  * không bao giờ đổi: cache-first trong một cache riêng, giữ qua các lần nâng cấp app.
  * Khi phát hành phiên bản mới có đổi danh sách file, tăng VERSION.
  * ========================================================================= */
-const VERSION = 'v12';
+const VERSION = 'v13';
 const CACHE = `diagram-editor-${VERSION}`;
 const CDN_CACHE = 'diagram-editor-cdn-v1';
 const CDN_ORIGIN = 'https://cdn.jsdelivr.net';
@@ -35,6 +35,7 @@ const PRECACHE = [
   'js/guide.js',
   'js/page-kit.js',
   'js/page-editor.js',
+  'js/page-import.js',
   'js/settings.js',
   'js/main.js',
   'icons/icon.svg',

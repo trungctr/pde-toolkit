@@ -258,6 +258,7 @@ nhân bản · xoá.
 | Biểu mẫu | Biểu mẫu · Ô nhập · Ô nhiều dòng · Hộp chọn · Ô đánh dấu · Nút gửi | Đặt các ô và nút gửi **bên trong** một Biểu mẫu |
 | Dữ liệu | Bảng | Sửa ô ngay trên trang (\`Tab\` sang ô kế), hoặc dán từ Excel |
 | Ngăn cách | Thanh ngang · Thanh dọc · Khoảng trống | Thanh dọc dùng trong một Hàng |
+| Trang trí | Hình chữ nhật · Hình tròn · Nhãn · Đốm màu chuyển sắc | **Hình trang trí**: khối có kích thước, nền / chuyển sắc, viền, chữ tuỳ chọn – làm nhãn, huy hiệu, lớp phủ, hình nền |
 | Mẫu dựng sẵn | Thanh điều hướng · Ảnh bìa · 3 tính năng · Bảng giá · Biểu mẫu liên hệ · Chân trang | Kéo vào là có cả cụm đã căn chỉnh đẹp |
 
 ### Nút bấm
@@ -287,6 +288,55 @@ Thẻ, ảnh, hàng, cột… cũng có nhóm hiệu ứng này (ví dụ thẻ 
 - **Hàng** tự xếp chồng thành cột trên điện thoại (tắt bằng “Trên điện thoại: xếp chồng thành cột dọc”).
 - Nhóm **Hiển thị** của mọi thành phần có **Ẩn trên điện thoại** / **Ẩn trên máy tính** – ví dụ thanh nút chỉ hiện trên máy tính,
   còn nút ☰ mở menu toàn trang chỉ hiện trên điện thoại (thanh điều hướng mẫu đã làm sẵn như vậy).
+
+### Chữ có định dạng
+
+Tiêu đề, đoạn văn, các mục danh sách, ô bảng và hình trang trí nhận **chữ đậm, nghiêng, liên kết, màu ngay giữa câu**:
+
+- Nhấn đúp để sửa trên trang: \`Ctrl+B\` đậm · \`Ctrl+I\` nghiêng · \`Ctrl+U\` gạch chân · \`Ctrl+K\` liên kết, hoặc dùng
+  thanh định dạng nổi phía trên chữ (có cả màu chữ). Dán chữ từ trang khác vẫn giữ đậm / nghiêng / liên kết.
+- Hoặc gõ trong ô **Nội dung**: \`**đậm**\` · \`_nghiêng_\` · \`++gạch chân++\` · \`~~gạch ngang~~\` · \`==tô sáng==\` ·
+  \`[chữ](https://…)\` · \`[chữ](#/duong-dan-trang)\` · \`[chữ](#ma-neo)\` · \`[chữ]{#e11d48}\` (màu) · \`[chữ]{bg:#fef08a}\` (nền).
+  Muốn gõ dấu \`*\` thường thì viết \`\\*\`.
+
+### Màu chuyển sắc, vị trí tự do, chuyển động
+
+- **Màu chuyển sắc** (nhóm Nền): thẳng / toả tròn / xoay vòng, góc, các điểm màu (dùng \`rgba(…)\` để trong suốt – làm lớp phủ
+  lên ảnh nền). Tiêu đề / đoạn văn có thêm **Chữ màu chuyển sắc**.
+- **Vị trí tự do, lớp chồng & xoay**: **Tự do trong khung** đặt thành phần theo khoảng cách tới mép khung chứa (px hoặc %),
+  nằm chồng lên thành phần khác – **kéo trực tiếp trên trang** để đổi chỗ. **Cố định trên màn hình**: đứng yên khi cuộn (nút chat,
+  nút gọi). **Lớp chồng** âm = nằm dưới nội dung (hình trang trí, lớp phủ). Thêm **dịch** (vd \`-50%\` để căn giữa) và **xoay**.
+  **Mã neo**: nút / liên kết có địa chỉ \`#ma-neo\` sẽ cuộn tới thành phần này.
+- **Chuyển động**: hiện dần, trượt, phóng to, lật, nảy, nhịp đập, rung, xoay, bồng bềnh hoặc **tuỳ chỉnh từng khung hình**;
+  bắt đầu khi mở trang hoặc **khi cuộn tới**, thời gian, chờ, nhịp, lặp lại. Trong khung soạn, bấm **▶ Xem chuyển động trên trang**;
+  “Xem thử” chạy như trang thật. Người dùng bật “giảm chuyển động” trong hệ điều hành sẽ không thấy chuyển động.
+
+### Font riêng
+
+Bỏ chọn mọi thành phần → nhóm **Font riêng của dự án**: thêm font **Google Fonts** theo tên (kèm các độ đậm cần dùng),
+**tải file font** (.woff2 / .woff / .ttf / .otf – tên file như \`Poppins-SemiBold.woff2\` tự nhận ra độ đậm) hoặc dán địa chỉ file font.
+Font riêng hiện trong ô **Font chữ** của mọi thành phần và của cả trang; file font tải lên nằm trong dự án và file HTML xuất ra.
+
+### Nhập trang HTML
+
+Bấm **Nhập HTML** trên thanh công cụ (hoặc **kéo thả file \`.html\` / cả thư mục trang web** vào cửa sổ, hoặc dán mã HTML)
+để biến một trang web có sẵn thành các thành phần kéo thả được:
+
+1. App hỏi trước: **thêm thành trang mới**, **thay cả dự án** hay **chèn vào trang đang mở**; báo **file còn thiếu** (ảnh, CSS, font
+   mà trang dùng tới – chọn thêm file hoặc cả thư mục); có **chạy JavaScript của trang** không (cần cho trang dựng bằng React /
+   Vue / Tailwind CDN – script chạy trong khung cách ly, không đọc được dữ liệu của app); và **cách chuyển**.
+2. **Tự động**: app dựng trang trong khung ẩn, đo style thật ở bề rộng máy tính và điện thoại rồi chuyển thành khối, hàng, cột,
+   chữ, nút, ảnh, menu, bảng, biểu mẫu – giữ màu, font (Google Fonts, \`@font-face\`), chuyển sắc, \`position: absolute / fixed\`,
+   \`::before / ::after\` (thành hình trang trí), hiệu ứng \`:hover\`, \`@keyframes\` / AOS / animate.css, chữ đậm và liên kết giữa câu,
+   phần ẩn trên điện thoại, menu ☰, liên kết giữa các file và liên kết neo \`#id\`.
+3. **Nhờ AI**: gửi **trọn** mã HTML + CSS (kèm bản chuyển tự động để AI có số đo thật) cho mô hình đang chọn. App đếm token và
+   **cảnh báo khi gần chạm hoặc vượt độ dài ngữ cảnh** của mô hình – lúc đó chọn vẫn gửi, dùng kết quả tự động hoặc huỷ.
+4. Bảng **Kết quả chuyển đổi** cho biết phần giữ được, phần gần đúng; hỏi font không có nguồn (lấy từ Google Fonts hay dùng font
+   gần nhất) và cho chọn ảnh bị thiếu từ máy. Mọi thay đổi hoàn tác được bằng \`Ctrl+Z\`.
+
+> [!NOTE]
+> Video, khung nhúng (YouTube, bản đồ) thành khung ảnh (ảnh bìa nếu có); biểu tượng SVG trong nút đổi thành ký tự gần nghĩa;
+> nút chạy JavaScript thành nút không làm gì – gắn lại liên kết sau.
 
 ### Xem thử và xuất file
 

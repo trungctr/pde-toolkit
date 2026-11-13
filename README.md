@@ -296,6 +296,7 @@ Tab **Thiết kế trang** dựng trang web bằng **kéo thả** cho người k
 | Biểu mẫu | Biểu mẫu, Ô nhập (chữ, email, số điện thoại, số, mật khẩu, ngày, nhiều dòng), Hộp chọn, Ô đánh dấu, Nút gửi | Khi gửi: hiện lời cảm ơn, gửi tới URL (POST/GET) hoặc gọi hàm JavaScript |
 | Dữ liệu | Bảng | Dòng tiêu đề, kẻ ô / kẻ ngang, tô xen kẽ, tô sáng hàng khi di chuột qua, dán từ Excel |
 | Ngăn cách | Thanh ngang, Thanh dọc, Khoảng trống | |
+| Trang trí | Hình chữ nhật, Hình tròn, Nhãn, Đốm màu chuyển sắc (`shape`) | Khối có `w` / `h` (px hoặc %), bo tròn hẳn, nền / chuyển sắc / ảnh, viền, bóng, chữ tuỳ chọn – nhãn, huy hiệu, lớp phủ, hình nền |
 | Mẫu dựng sẵn | Thanh điều hướng (kèm menu ☰ cho điện thoại), Ảnh bìa, 3 tính năng, Bảng giá, Biểu mẫu liên hệ, Chân trang | |
 
 **Nút bấm** có ba nhóm thuộc tính chính:
@@ -314,6 +315,44 @@ hiệu ứng hiện dần / trượt xuống / trượt từ phải); nền (mà
 đóng khi bấm ra ngoài / khi chọn một mục.
 
 Mọi thành phần có nhóm **Hiển thị**: độ rõ, **ẩn trên điện thoại**, **ẩn trên máy tính & máy tính bảng** (điểm ngắt 640px).
+
+**Chữ có định dạng** (tiêu đề, đoạn văn, mục danh sách, ô bảng, hình trang trí) – cú pháp gọn, mọi thứ khác đều được thoát
+nên không chèn được HTML: `**đậm**`, `_nghiêng_`, `++gạch chân++`, `~~gạch ngang~~`, `==tô sáng==`, `` `mã` ``,
+`[chữ](https://… | #/duong-dan | #ma-neo)`, `[chữ](url){#fff nu}` (màu / bỏ gạch chân của liên kết), `[chữ]{#e11d48 bg:#fef08a f:cf-…}`
+(màu chữ, màu nền, font riêng). Sửa trên trang có `Ctrl+B / I / U / K` và thanh định dạng nổi; dán từ nơi khác giữ đậm /
+nghiêng / liên kết (`PK.domToInline`).
+
+**Màu chuyển sắc** (`bgGrad`, `textGrad`: linear / radial / conic, góc, tâm, điểm màu), **vị trí tự do** (`pos`: absolute theo khung
+chứa – mọi khung là mốc `position: relative` – hoặc fixed; `posTop/Right/Bottom/Left` px hoặc %; `zIndex` – âm thì khung chứa tự
+`isolation: isolate`; `shiftX/Y`, `rotate` dùng thuộc tính `translate` / `rotate` riêng nên không đè hiệu ứng hover), **mã neo**
+(`anchorId` → `id`, runtime cuộn tới có trừ phần đầu trang dính), **chuyển động** (`anim`: 14 kiểu có sẵn hoặc `custom` +
+`animFrames`; `animOn: "scroll"` dùng `IntersectionObserver`; tôn trọng `prefers-reduced-motion`; khung soạn chỉ chạy khi bấm
+“Xem chuyển động”) và **font riêng** của dự án (`fonts`: Google Fonts theo tên + độ đậm, hoặc file `.woff2/.ttf` nhúng dạng
+`data:` / địa chỉ https – sinh `@font-face`).
+
+### Nhập trang HTML
+
+Nút **Nhập HTML** (hoặc kéo thả file `.html` / cả thư mục trang web, hoặc dán mã) – `js/page-import.js`:
+
+1. **Hỏi trước**: thêm trang / thay dự án / chèn vào trang đang mở; file thiếu (ảnh, CSS, font, JS được tham chiếu nhưng không
+   có trong gói – chọn thêm file / thư mục); có chạy JavaScript của trang không (tự gợi ý bật với trang React / Vue / Tailwind CDN);
+   chuyển tự động hay nhờ AI.
+2. **Dựng & đo**: CSS, ảnh, font trên máy được nhúng thành `data:`; trang chạy trong `iframe sandbox="allow-scripts"` **không**
+   `allow-same-origin` (script của trang – nếu cho chạy – không đọc được dữ liệu app). Một đoạn mã đo chèn vào iframe đọc cây
+   phần tử với `getComputedStyle`, `::before/::after`, luật `:hover/:active`, `@keyframes`, `@font-face`, Google Fonts (CSS từ CDN
+   quen thuộc được gắn `crossorigin` để đọc được luật), ở 1280px rồi 390px, gửi về bằng `postMessage`.
+3. **Chuyển**: khối toàn trang → `section` (nhận ra khung giữa `max-width + margin:auto` → `contentW`), flex / grid → `row` / `col`
+   (lưới nhiều dòng → nhiều hàng, độ rộng %), inline-block cùng dòng → hàng, chữ trong dòng → chữ có định dạng, khoảng cách đo từ
+   vị trí thật (gồm margin), phần ẩn trên điện thoại → `hideMobile` / `hideDesktop`, khối ẩn chứa liên kết + nút `aria-controls` /
+   ☰ → `menu` + nút “Mở menu”, `::before/::after` → hình trang trí (lớp phủ phủ kín → `zIndex: -1`), SVG → ảnh, font biểu tượng
+   (Font Awesome, Material Icons) giữ nguyên font nếu có nguồn, không thì đổi ký tự gần nghĩa; AOS / animate.css / WOW / `@keyframes`
+   → chuyển động; liên kết giữa các file → liên kết trang, `#id` → mã neo. Mọi giá trị đi qua `PK.normalize`.
+4. **AI** (tuỳ chọn): gửi trọn HTML + CSS (kèm CSS tải từ CDN, bản chuyển tự động) – ảnh / font nhúng thay bằng `@data:N` rồi khôi
+   phục; đếm token bằng API của nhà cung cấp khi có (`count_tokens` của Claude, `countTokens` của Gemini), không thì ước lượng;
+   so với độ dài ngữ cảnh lấy từ danh sách mô hình (Claude `max_input_tokens`, Gemini `inputTokenLimit`, OpenRouter
+   `context_length`, Ollama `/api/show`…) và **cảnh báo khi gần chạm / vượt**. Claude trả lời dài dùng streaming.
+5. **Xem lại**: phần giữ được / gần đúng, hỏi font không có nguồn (Google Fonts hay font gần nhất), chọn ảnh thiếu từ máy;
+   áp dụng hoàn tác được.
 
 ### Xem thử, xuất file, dữ liệu
 

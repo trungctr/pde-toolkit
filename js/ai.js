@@ -23,7 +23,7 @@
         return (data.models || [])
           .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent') && /gemini/i.test(m.name))
           .filter((m) => !/(embedding|tts|image|live|native-audio|aqa)/i.test(m.name))
-          .map((m) => ({ id: m.name.replace(/^models\//, ''), label: m.displayName || m.name }));
+          .map((m) => ({ id: m.name.replace(/^models\//, ''), label: m.displayName || m.name, ctx: m.inputTokenLimit || 0, out: m.outputTokenLimit || 0 }));
       },
     },
     openai: {
@@ -56,7 +56,8 @@
         });
         if (!res.ok) throw await httpError(res);
         const data = await res.json();
-        return (data.data || []).map((m) => ({ id: m.id, label: m.display_name || m.id }));
+        // max_input_tokens: cửa sổ ngữ cảnh · max_tokens: giới hạn đầu ra
+        return (data.data || []).map((m) => ({ id: m.id, label: m.display_name || m.id, ctx: m.max_input_tokens || 0, out: m.max_tokens || 0 }));
       },
     },
     // ---------------------------------------------------- có gói miễn phí (API kiểu OpenAI, cho phép CORS)
@@ -81,10 +82,10 @@
             const a = m.architecture || {};
             return (!a.output_modalities || a.output_modalities.includes('text')) && !(a.output_modalities || []).includes('audio');
           })
-          .map((m) => ({ id: m.id, label: m.name || m.id, free: isFree(m), created: m.created || 0, ctx: m.context_length || 0 }))
+          .map((m) => ({ id: m.id, label: m.name || m.id, free: isFree(m), created: m.created || 0, ctx: m.context_length || 0, out: (m.top_provider && m.top_provider.max_completion_tokens) || 0 }))
           // “openrouter/free” đầu tiên, rồi mô hình miễn phí (ngữ cảnh dài trước – thường là mô hình lớn hơn), rồi mô hình trả phí mới nhất
           .sort((a, b) => (b.id === 'openrouter/free') - (a.id === 'openrouter/free') || b.free - a.free || (a.free ? b.ctx - a.ctx : b.created - a.created))
-          .map(({ id, label, free }) => ({ id, label: (free ? '🆓 ' : '') + label, free }));
+          .map(({ id, label, free, ctx, out }) => ({ id, label: (free ? '🆓 ' : '') + label, free, ctx, out }));
       },
     },
     groq: {
@@ -239,7 +240,12 @@
       .map((m) => (typeof m === 'string' ? { id: m } : m))
       .filter((m) => m && m.id && (!P.exclude || !P.exclude.test(m.id)) && (!P.keep || P.keep(m)))
       .sort((a, b) => (b.created || 0) - (a.created || 0))
-      .map((m) => ({ id: m.id, label: m.name && m.name !== m.id ? m.name : m.id }));
+      .map((m) => ({
+        id: m.id,
+        label: m.name && m.name !== m.id ? m.name : m.id,
+        // mỗi máy chủ ghi độ dài ngữ cảnh một kiểu (Groq: context_window, Mistral: max_context_length, vLLM: max_model_len…)
+        ctx: +(m.context_length || m.context_window || m.max_context_length || m.max_model_len || m.max_context || 0) || 0,
+      }));
   }
 
   /** Bỏ phần suy luận mà một số mô hình mở (DeepSeek-R1, Qwen…) chèn thẳng vào nội dung */
@@ -278,7 +284,7 @@
   const OPENAI_EFFORT = { low: ['low'], medium: ['medium'], high: ['high'], xhigh: ['xhigh', 'high'], max: ['xhigh', 'high'] };
 
   const CHAT = {
-    async gemini({ key, model, system, messages, signal, effort, thinking }) {
+    async gemini({ key, model, system, messages, signal, effort, thinking, maxTokens }) {
       // Gemini 3.x: thinkingLevel; Gemini 2.5: thinkingBudget (0 = tắt)
       let cfgs = [null];
       if (thinking === false) cfgs = [{ thinkingLevel: 'minimal' }, { thinkingBudget: 0 }, null];
@@ -289,7 +295,7 @@
           systemInstruction: { parts: [{ text: system }] },
           contents: messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
         };
-        if (tc) body.generationConfig = { thinkingConfig: tc };
+        if (tc || maxTokens) body.generationConfig = Object.assign(tc ? { thinkingConfig: tc } : {}, maxTokens ? { maxOutputTokens: maxTokens } : {});
         const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
           method: 'POST',
           signal,
@@ -335,11 +341,14 @@
     },
 
     /** Ollama: API gốc /api/chat để tự đặt num_ctx (mặc định của Ollama quá ngắn, sẽ cắt mất skill) */
-    async ollama({ P, model, base, system, messages, signal, effort, thinking }) {
+    async ollama({ P, model, base, system, messages, signal, effort, thinking, numCtx }) {
       const all = [{ role: 'system', content: system }, ...messages];
       const chars = all.reduce((s, m) => s + m.content.length, 0);
       let ctx = 8192;
-      while (ctx < chars / 3.2 + 4096 && ctx < 65536) ctx *= 2; // ~10k token skill + diagram + câu trả lời
+      // ~10k token skill + diagram + câu trả lời; nhập trang HTML dài: được nới tới độ dài ngữ cảnh của mô hình (numCtx)
+      const cap = Math.max(65536, numCtx || 0);
+      while (ctx < chars / 3.2 + 4096 && ctx < cap) ctx *= 2;
+      if (numCtx) ctx = Math.min(ctx, numCtx);
       let thinks = [undefined];
       if (thinking === false) thinks = [false, undefined];
       else if (effort) thinks = [{ low: 'low', medium: 'medium' }[effort] || 'high', true, undefined];
@@ -357,7 +366,7 @@
       );
     },
 
-    async anthropic({ key, model, system, messages, signal, effort, thinking }) {
+    async anthropic({ key, model, system, messages, signal, effort, thinking, maxTokens, onProgress }) {
       // Theo tài liệu Claude API:
       //  - Opus 5.5 / Fable / Mythos: thinking luôn bật – gửi "disabled" bị 400 -> không gửi gì
       //  - Sonnet 5.5: tắt bằng { type: "between_tools" }, chỉ hợp lệ khi effort ≤ high
@@ -373,29 +382,27 @@
         }
       } else if (thinking !== false) th = { type: 'adaptive' };
       const variants = [{ th, eff }, { th: null, eff }, { th: null, eff: null }];
+      // đầu ra dài (vd chuyển cả trang HTML): dùng streaming để không bị ngắt kết nối khi mô hình viết lâu
+      const stream = (maxTokens || 0) > 16000;
       const r = await tryVariants(variants, async (v) => {
         const body = {
           model,
-          max_tokens: 16000,
+          max_tokens: maxTokens || 16000,
           // skill là phần cố định đầu request -> cache lại, các lượt sau chỉ tính phí đọc cache
           system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
           messages,
         };
         if (v.th) body.thinking = v.th;
         if (v.eff) body.output_config = { effort: v.eff };
+        if (stream) body.stream = true;
         const res = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           signal,
-          headers: {
-            'content-type': 'application/json',
-            'x-api-key': key,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
+          headers: ANTHROPIC_HEADERS(key),
           body: JSON.stringify(body),
         });
         if (!res.ok) throw await httpError(res);
-        const data = await res.json();
+        const data = stream ? await readAnthropicStream(res, onProgress) : await res.json();
         if (data.stop_reason === 'refusal') {
           const why = data.stop_details && (data.stop_details.explanation || data.stop_details.category);
           throw new Error('Claude từ chối yêu cầu' + (why ? `: ${why}` : ''));
@@ -408,6 +415,104 @@
       return r;
     },
   };
+
+  const ANTHROPIC_HEADERS = (key) => ({
+    'content-type': 'application/json',
+    'x-api-key': key,
+    'anthropic-version': '2023-06-01',
+    'anthropic-dangerous-direct-browser-access': 'true',
+  });
+
+  /**
+   * Đọc câu trả lời streaming (SSE) của Claude, gom lại thành dạng giống câu trả lời thường:
+   * { content:[{ type:'text', text }], stop_reason, stop_details }. onProgress(số ký tự đã nhận)
+   */
+  async function readAnthropicStream(res, onProgress) {
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    const blocks = [];
+    let buf = '', stop = null, details = null, got = 0;
+    const handle = (raw) => {
+      const data = raw
+        .split('\n')
+        .filter((l) => l.startsWith('data:'))
+        .map((l) => l.slice(5).trim())
+        .join('');
+      if (!data) return;
+      let ev;
+      try {
+        ev = JSON.parse(data);
+      } catch (_) {
+        return;
+      }
+      if (ev.type === 'error') {
+        const e = new Error('Claude: ' + ((ev.error && (ev.error.message || ev.error.type)) || 'lỗi khi đang trả lời'));
+        e.status = ev.error && ev.error.type === 'overloaded_error' ? 529 : 500;
+        throw e;
+      }
+      if (ev.type === 'content_block_start') blocks[ev.index] = Object.assign({}, ev.content_block, ev.content_block.type === 'text' ? { text: ev.content_block.text || '' } : {});
+      else if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta' && blocks[ev.index]) {
+        blocks[ev.index].text += ev.delta.text;
+        got += ev.delta.text.length;
+        if (onProgress) onProgress(got);
+      } else if (ev.type === 'message_delta' && ev.delta) {
+        if (ev.delta.stop_reason) stop = ev.delta.stop_reason;
+        if (ev.delta.stop_details) details = ev.delta.stop_details;
+      }
+    };
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+      let k;
+      while ((k = buf.indexOf('\n\n')) >= 0) {
+        handle(buf.slice(0, k));
+        buf = buf.slice(k + 2);
+      }
+    }
+    if (buf.trim()) handle(buf);
+    return { content: blocks.filter(Boolean), stop_reason: stop, stop_details: details };
+  }
+
+  // ------------------------------------------------------------ độ dài ngữ cảnh · đếm token
+  /** Ước lượng số token khi không có API đếm: chữ Latin / mã ~3.3 ký tự / token, chữ có dấu & ký tự khác ~1.6 */
+  function estimateTokens(text) {
+    const s = String(text || '');
+    let ascii = 0;
+    for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) < 128) ascii++;
+    return Math.ceil(ascii / 3.3 + (s.length - ascii) / 1.6);
+  }
+  /** Độ dài ngữ cảnh / đầu ra đoán theo tên mô hình (khi nhà cung cấp không cho biết) */
+  function guessLimits(model) {
+    const m = String(model || '').toLowerCase();
+    const R = [
+      [/claude-haiku-4-5|claude-3/, 200000, 64000],
+      [/claude/, 1000000, 128000],
+      [/gemini/, 1048576, 65536],
+      [/gpt-4\.1/, 1047576, 32768],
+      [/gpt-5|gpt-6/, 400000, 128000],
+      [/gpt-4o|chatgpt/, 128000, 16384],
+      [/^o\d/, 200000, 100000],
+      [/gpt-oss/, 131072, 32768],
+      [/llama-?4/, 1000000, 32768],
+      [/llama|qwen|deepseek|mistral|mixtral|gemma|nemotron|phi|command/, 131072, 8192],
+    ];
+    for (const [re, ctx, out] of R) if (re.test(m)) return { ctx, out };
+    return { ctx: 0, out: 0 };
+  }
+  /** Ollama: hỏi độ dài ngữ cảnh của mô hình (/api/show -> model_info["*.context_length"]) */
+  async function ollamaCtx(base, model) {
+    try {
+      const res = await fetch(`${base}/api/show`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ model }) });
+      if (!res.ok) return 0;
+      const data = await res.json();
+      const info = data.model_info || {};
+      const k = Object.keys(info).find((x) => /\.context_length$/.test(x));
+      return k ? +info[k] || 0 : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
 
   async function httpError(res) {
     let detail = '';
@@ -520,9 +625,63 @@
       const b = baseOf(provider, load(), base);
       const list = P.listModels ? await P.listModels.call(P, key, b) : await compatModels(P, key, b);
       const c = load();
-      c.lists[provider] = list.map((m) => ({ id: m.id, label: m.label, ...(m.free ? { free: true } : {}) }));
+      c.lists[provider] = list.map((m) => ({ id: m.id, label: m.label, ...(m.free ? { free: true } : {}), ...(m.ctx ? { ctx: m.ctx } : {}), ...(m.out ? { out: m.out } : {}) }));
       save(c);
       return list;
+    },
+    estimateTokens,
+    /**
+     * Giới hạn của mô hình: { ctx (ngữ cảnh), out (đầu ra tối đa), exact (lấy từ nhà cung cấp) }.
+     * Ưu tiên số liệu nhà cung cấp trả về khi tải danh sách mô hình; không có thì đoán theo tên.
+     */
+    async modelInfo(provider, model) {
+      const c = load();
+      const m = ((c.lists || {})[provider] || []).find((x) => x.id === model);
+      const g = guessLimits(model);
+      let ctx = (m && m.ctx) || 0, exact = !!ctx;
+      if (!ctx && PROVIDERS[provider] && PROVIDERS[provider].native === 'ollama') {
+        ctx = await ollamaCtx(baseOf(provider, c), model);
+        exact = !!ctx;
+      }
+      return { ctx: ctx || g.ctx, out: (m && m.out) || g.out, exact };
+    },
+    /** Đếm token chính xác bằng API của nhà cung cấp (Claude, Gemini). null nếu không đếm được */
+    async countTokens({ system, messages, signal }) {
+      const a = this.active();
+      if (!a) return null;
+      try {
+        if (a.provider === 'anthropic') {
+          const res = await fetch('https://api.anthropic.com/v1/messages/count_tokens', {
+            method: 'POST',
+            signal,
+            headers: ANTHROPIC_HEADERS(a.key),
+            body: JSON.stringify({ model: a.model, system, messages }),
+          });
+          if (!res.ok) return null;
+          const d = await res.json();
+          return typeof d.input_tokens === 'number' ? d.input_tokens : null;
+        }
+        if (a.provider === 'gemini') {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(a.model)}:countTokens?key=${encodeURIComponent(a.key)}`, {
+            method: 'POST',
+            signal,
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              generateContentRequest: {
+                model: 'models/' + a.model,
+                systemInstruction: { parts: [{ text: system }] },
+                contents: messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+              },
+            }),
+          });
+          if (!res.ok) return null;
+          const d = await res.json();
+          return typeof d.totalTokens === 'number' ? d.totalTokens : null;
+        }
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+      }
+      return null;
     },
     /** Gửi hội thoại tới mô hình đang chọn. opts: { system, messages, signal } */
     chat(opts) {

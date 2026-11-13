@@ -2091,7 +2091,7 @@
         ws === 'doc'
           ? '<b>Thả file vào đây</b><span>.md – mở để chỉnh sửa · .json – nhúng diagram · ảnh – chèn vào tài liệu</span>'
           : ws === 'design'
-            ? '<b>Thả file vào đây</b><span>.json – mở dự án thiết kế trang · ảnh – thêm vào trang tại chỗ thả · .md – mở ở tab Tài liệu</span>'
+            ? '<b>Thả file vào đây</b><span>.html hoặc cả thư mục trang web – nhập thành thành phần · .json – mở dự án thiết kế trang · ảnh – thêm vào trang tại chỗ thả</span>'
             : '<b>Thả file vào đây</b><span>.md – mở ở tab Tài liệu · .json – mở diagram</span>';
       ov.hidden = false;
     });
@@ -2110,6 +2110,13 @@
       hide();
       if (document.querySelector('.modal-backdrop')) return;
       const files = [...e.dataTransfer.files];
+      // tab Thiết kế trang: file .html (kèm ảnh, CSS, font) hoặc cả thư mục trang web -> nhập trang HTML
+      if (ws === 'design' && DE.pageImport && DE.pageImport.dropHasHtml(e.dataTransfer)) {
+        return DE.pageImport
+          .entriesFromDrop(e.dataTransfer)
+          .then((entries) => DE.pageImport.open(entries))
+          .catch((err) => toast('Không đọc được file thả vào: ' + err.message, 'error'));
+      }
       const md = files.find(isMdFile);
       if (md) {
         if (files.length > 1) toast('Mỗi lần mở được một file .md – đã mở "' + md.name + '"', 'info');

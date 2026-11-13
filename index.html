@@ -70,6 +70,7 @@
       "Nhập bằng giọng nói, lệnh giọng nói, phản hồi bằng giọng nói; nhận dạng offline bằng Moonshine",
       "Soạn và xem tài liệu Markdown (.md), nhúng diagram vào tài liệu và sửa lại bất cứ lúc nào",
       "Thiết kế trang web bằng kéo thả: hàng, cột, nút bấm, menu, bảng, biểu mẫu; xem theo máy tính / máy tính bảng / điện thoại; xuất HTML",
+      "Nhập trang HTML có sẵn thành thành phần kéo thả được (tự động hoặc nhờ AI)",
       "Chạy offline, không cần cài đặt, không cần tài khoản"
     ],
     "keywords": "tài liệu thiết kế phần mềm, mẫu SRS, SDD, ERD, API, ma trận truy vết, ISO/IEC/IEEE 12207, BPMN, UML, flowchart, Markdown, chat AI",
@@ -333,6 +334,7 @@
           <button data-pg="new" data-icon="new" title="Dự án mới (trống hoặc mẫu)"></button>
           <button data-pg="open" data-icon="open" title="Mở dự án .json (Ctrl+O)"></button>
           <button data-pg="save" data-icon="save" title="Tải dự án .json (Ctrl+S)"></button>
+          <button data-pg="import-html" class="text-btn pg-import-btn" title="Nhập trang HTML có sẵn thành thành phần kéo thả được – giữ màu, font, bố cục, hiệu ứng, chuyển động (hoặc kéo thả file / thư mục trang web vào cửa sổ)"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M12 4v11M8.5 11.5L12 15l3.5-3.5"/></svg>Nhập HTML</button>
           <input id="pg-name" class="doc-name" type="text" spellcheck="false" autocomplete="off" title="Tên dự án (dùng làm tên file và tiêu đề trang web)" aria-label="Tên dự án">
         </div>
         <div class="tb-group">
@@ -516,6 +518,7 @@
   <script src="js/guide.js"></script>
   <script src="js/page-kit.js"></script>
   <script src="js/page-editor.js"></script>
+  <script src="js/page-import.js"></script>
   <script src="js/settings.js"></script>
   <script src="js/main.js"></script>
 </body>

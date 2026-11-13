@@ -120,6 +120,274 @@
   };
   /** Chuỗi an toàn bên trong url("…") của CSS (kể cả khi CSS nằm trong thẻ <style>) */
   const cssUrl = (u) => 'url("' + String(u).replace(/["\\\n\r<>]/g, (c) => encodeURIComponent(c)) + '")';
+  PK.cssUrl = cssUrl;
+  /** File font: https / đường dẫn tương đối, hoặc data:font/…;base64. Trả null nếu không dùng được */
+  PK.safeFont = function (u) {
+    if (typeof u !== 'string') return null;
+    u = u.trim();
+    if (/^data:/i.test(u)) {
+      const s = u.replace(/\s+/g, '');
+      return /^data:(font\/(woff2?|ttf|otf|sfnt|collection)|application\/(font-woff2?|x-font-(ttf|otf|woff)|font-sfnt|vnd\.ms-opentype|octet-stream));base64,[a-z0-9+/]+=*$/i.test(s) && s.length < 6e6 ? s : null;
+    }
+    const s = PK.safeUrl(u);
+    return s && !/^(mailto|tel):|^#/i.test(s) ? s : null;
+  };
+
+  // ------------------------------------------------------------ độ dài · màu chuyển sắc
+  const LEN_RE = /^(-?\d+(?:\.\d+)?)(px|%|vw|vh|em|rem)$/i;
+  /** Độ dài: số = px; chuỗi "50%", "10vw", "2em"… giữ nguyên */
+  const lenCss = (v) => (typeof v === 'number' ? DE.f(v) + 'px' : String(v));
+  PK.lenCss = lenCss;
+  const GRAD_AT = ['center', 'top', 'bottom', 'left', 'right', 'top left', 'top right', 'bottom left', 'bottom right'];
+  PK.GRAD_AT = GRAD_AT;
+  /** { kind: linear|radial|conic, angle, shape: circle|ellipse, at, stops:[{ c, p }] } -> CSS */
+  function gradCss(g) {
+    if (!g || !Array.isArray(g.stops) || g.stops.length < 2) return '';
+    const stops = g.stops.map((s) => s.c + (s.p != null ? ' ' + DE.f(s.p) + '%' : '')).join(',');
+    const at = GRAD_AT.includes(g.at) ? g.at : 'center';
+    if (g.kind === 'radial') return `radial-gradient(${g.shape === 'circle' ? 'circle' : 'ellipse'} at ${at},${stops})`;
+    if (g.kind === 'conic') return `conic-gradient(from ${DE.f(g.angle || 0)}deg at ${at},${stops})`;
+    return `linear-gradient(${DE.f(g.angle == null ? 180 : g.angle)}deg,${stops})`;
+  }
+  PK.gradCss = gradCss;
+
+  // ------------------------------------------------------------ CHỮ ĐỊNH DẠNG GIỮA CÂU
+  // Cú pháp gọn (an toàn – mọi thứ khác đều được thoát):
+  //   **đậm**  *nghiêng* hoặc _nghiêng_  ++gạch chân++  ~~gạch ngang~~  ==tô sáng==  `mã`
+  //   [chữ](https://… | #/duong-dan | #ma-neo)   [chữ]{#e11d48}   [chữ]{bg:#fef08a}   [chữ]{#fff bg:#0f172a}
+  //   \* \[ … : ký tự thường · xuống dòng = <br>
+  const INL_ESC = /[\\*_`[\]{}()~=+#]/;
+  const PAIRS = [['**', 'strong'], ['++', 'u'], ['~~', 's'], ['==', 'mark'], ['*', 'em'], ['_', 'em']];
+  const WORD = /[\p{L}\p{N}]/u;
+  const isWs = (c) => c === undefined || /\s/.test(c);
+  /** Mở được tại i (ký tự tiếp theo không phải khoảng trắng; "_" không nằm giữa từ) */
+  function canOpen(src, d, i) {
+    const nx = src[i + d.length];
+    if (isWs(nx)) return false;
+    if (d === '*' && nx === '*') return false;
+    if (d === '_' && (WORD.test(src[i - 1] || '') || nx === '_')) return false;
+    return true;
+  }
+  function canClose(src, d, i) {
+    if (isWs(src[i - 1])) return false;
+    if (d === '_' && WORD.test(src[i + 1] || '')) return false;
+    return true;
+  }
+  /** Kiểu của [chữ]{…}: màu chữ, bg:màu nền, f:font riêng, nu (bỏ gạch chân liên kết). null nếu không có gì hợp lệ */
+  function spanStyle(attrs, ctx) {
+    const out = [];
+    for (const tok of attrs.trim().split(/\s+|;/)) {
+      if (!tok) continue;
+      const m = tok.match(/^(bg|nen|nền|f):(.+)$/i);
+      if (m && m[1].toLowerCase() === 'f') {
+        // font riêng của dự án (vd font biểu tượng): f:cf-…
+        const ff = /^cf-[a-z0-9-]{1,40}$/.test(m[2]) || FONTS[m[2]] ? fontFamily(m[2], ctx && ctx.proj) : null;
+        if (ff) out.push('font-family:' + ff.replace(/"/g, "'"));
+      } else if (m) {
+        if (isColor(m[2])) out.push('background-color:' + m[2].toLowerCase());
+      } else if (tok === 'nu') out.push('text-decoration:none');
+      else if (isColor(tok)) out.push('color:' + tok.toLowerCase());
+    }
+    return out.length ? out.join(';') : null;
+  }
+  /** Chữ có định dạng -> HTML an toàn. ctx.edit: liên kết không bấm được (khung soạn) */
+  function inlineHTML(src, ctx) {
+    src = String(src == null ? '' : src);
+    if (!/[\\*_`[~=+\n]/.test(src)) return esc(src);
+    const edit = !!(ctx && ctx.edit);
+    const failed = new Set();
+    let i = 0;
+    const sub = (a, b) => inlineHTML(src.slice(a, b), ctx);
+    function bracket() {
+      let depth = 0, j = i;
+      for (; j < src.length; j++) {
+        const ch = src[j];
+        if (ch === '\\') j++;
+        else if (ch === '[') depth++;
+        else if (ch === ']' && --depth === 0) break;
+      }
+      if (j >= src.length) return null;
+      const nx = src[j + 1];
+      if (nx === '(') {
+        // địa chỉ có thể chứa ngoặc cân bằng: (…(…)…)
+        let k = j + 2;
+        for (let dep = 1; k < src.length; k++) {
+          if (src[k] === '\n') return null;
+          if (src[k] === '(') dep++;
+          else if (src[k] === ')' && --dep === 0) break;
+        }
+        if (k >= src.length) return null;
+        const u = PK.safeUrl(src.slice(j + 2, k).trim());
+        const label = sub(i + 1, j);
+        i = k + 1;
+        // kiểu riêng của liên kết: [chữ](url){#fff nu}
+        let sty = '';
+        if (src[i] === '{') {
+          const e = src.indexOf('}', i + 1);
+          const s2 = e > 0 ? spanStyle(src.slice(i + 1, e), ctx) : null;
+          if (s2) {
+            sty = ` style="${s2}"`;
+            i = e + 1;
+          }
+        }
+        if (!u) return sty ? `<span${sty}>${label}</span>` : label;
+        return edit ? `<a class="pg-link" data-href="${esc(u)}"${sty}>${label}</a>` : `<a class="pg-link" href="${esc(u)}"${sty}>${label}</a>`;
+      }
+      if (nx === '{') {
+        const k = src.indexOf('}', j + 2);
+        if (k < 0) return null;
+        const s = spanStyle(src.slice(j + 2, k), ctx);
+        if (!s) return null;
+        const label = sub(i + 1, j);
+        i = k + 1;
+        return `<span style="${s}">${label}</span>`;
+      }
+      return null;
+    }
+    function run(stop) {
+      let out = '';
+      while (i < src.length) {
+        if (stop && src.startsWith(stop, i) && canClose(src, stop, i)) {
+          i += stop.length;
+          return { html: out, closed: true };
+        }
+        const c = src[i];
+        if (c === '\\' && i + 1 < src.length && INL_ESC.test(src[i + 1])) {
+          out += esc(src[i + 1]);
+          i += 2;
+          continue;
+        }
+        if (c === '\n') {
+          out += '<br>';
+          i++;
+          continue;
+        }
+        if (c === '`') {
+          const j = src.indexOf('`', i + 1);
+          if (j > i + 1) {
+            out += '<code>' + esc(src.slice(i + 1, j)) + '</code>';
+            i = j + 1;
+            continue;
+          }
+        }
+        if (c === '[') {
+          const r = bracket();
+          if (r != null) {
+            out += r;
+            continue;
+          }
+        }
+        let hit = false;
+        for (const [d, tag] of PAIRS) {
+          if (!src.startsWith(d, i) || failed.has(d + '@' + i) || !canOpen(src, d, i) || src.indexOf(d, i + d.length + 1) < 0) continue;
+          const at = i;
+          i += d.length;
+          const r = run(d);
+          if (r.closed && r.html) {
+            out += `<${tag}>${r.html}</${tag}>`;
+            hit = true;
+            break;
+          }
+          failed.add(d + '@' + at);
+          i = at;
+        }
+        if (hit) continue;
+        out += esc(c);
+        i++;
+      }
+      return { html: out, closed: false };
+    }
+    return run(null).html;
+  }
+  PK.inline = inlineHTML;
+  /** Chữ thuần (bỏ ký hiệu định dạng) – cho tên lớp, mô tả ảnh… */
+  PK.plain = (s) =>
+    String(s == null ? '' : s)
+      .replace(/\[((?:\\.|[^\]\\])*)\](\([^)]*\)(\{[^}]*\})?|\{[^}]*\})/g, '$1')
+      .replace(/(^|[^\\])(\+\+|~~|==|`)/g, '$1')
+      .replace(/(^|[^\\])\*+/g, '$1')
+      .replace(/(^|[^\p{L}\p{N}\\])_(?=\S)|(?<=\S)_(?=$|[^\p{L}\p{N}])/gu, '$1')
+      .replace(/\\(.)/g, '$1');
+  /** Thoát chữ thường để không bị hiểu nhầm là ký hiệu định dạng */
+  PK.escInline = (s) =>
+    String(s == null ? '' : s)
+      .replace(/[\\*`[\]]/g, '\\$&')
+      .replace(/~~|==|\+\+/g, (m) => '\\' + m[0] + '\\' + m[1])
+      .replace(/(^|[^\p{L}\p{N}\\])_|_(?=$|[^\p{L}\p{N}])/gu, (m) => (m.length === 2 ? m[0] + '\\_' : '\\_'));
+  const rgbHex = (v) => {
+    const m = String(v || '').match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)$/i);
+    if (!m) return isColor(v) ? String(v).toLowerCase() : null;
+    const a = m[4] == null ? 1 : /%$/.test(m[4]) ? parseFloat(m[4]) / 100 : +m[4];
+    if (a < 0.02) return 'transparent';
+    if (a < 0.995) return `rgba(${+m[1]},${+m[2]},${+m[3]},${Math.round(a * 100) / 100})`;
+    return '#' + [m[1], m[2], m[3]].map((x) => (+x).toString(16).padStart(2, '0')).join('');
+  };
+  PK.rgbHex = rgbHex;
+  /** Đặt ký hiệu quanh chữ, đẩy khoảng trắng đầu / cuối ra ngoài (để "** đậm **" vẫn hợp lệ) */
+  const wrapInl = (s, l, r) => {
+    const m = s.match(/^(\s*)([\s\S]*?)(\s*)$/);
+    return m[2] ? m[1] + l + m[2] + r + m[3] : s;
+  };
+  PK.wrapInl = wrapInl;
+  /**
+   * Nội dung một phần tử HTML (khung sửa chữ, dán từ nơi khác) -> chữ có định dạng.
+   * Nhận <b>/<strong>, <i>/<em>, <u>, <s>, <mark>, <code>, <a>, <span style="color / background">, <br>, khối -> xuống dòng.
+   */
+  PK.domToInline = function (root) {
+    const BLOCK = /^(DIV|P|LI|H[1-6]|TR|BLOCKQUOTE|PRE|UL|OL|TABLE|SECTION|ARTICLE|HEADER|FOOTER)$/;
+    function walk(node, inLink) {
+      let out = '';
+      for (const ch of node.childNodes) {
+        if (ch.nodeType === 3) {
+          out += PK.escInline(ch.nodeValue.replace(/ /g, ' ').replace(/[ \t\r\n]+/g, ' '));
+          continue;
+        }
+        if (ch.nodeType !== 1) continue;
+        const tag = ch.tagName;
+        if (tag === 'BR') {
+          out += '\n';
+          continue;
+        }
+        if (/^(SCRIPT|STYLE|TEMPLATE|NOSCRIPT|META|LINK|TITLE)$/.test(tag)) continue;
+        if (tag === 'IMG') {
+          out += PK.escInline(ch.getAttribute('alt') || '');
+          continue;
+        }
+        if (tag === 'CODE' || tag === 'KBD' || tag === 'SAMP') {
+          const t = ch.textContent.replace(/`/g, "'").replace(/\s+/g, ' ');
+          if (t.trim()) out += '`' + t + '`';
+          continue;
+        }
+        const block = BLOCK.test(tag);
+        if (block && out && !out.endsWith('\n')) out += '\n';
+        let s = walk(ch, inLink || tag === 'A');
+        const sty = ch.style || {};
+        const fw = sty.fontWeight;
+        const deco = (sty.textDecorationLine || sty.textDecoration || '') + '';
+        if (tag === 'B' || tag === 'STRONG' || fw === 'bold' || fw === 'bolder' || +fw >= 600) s = wrapInl(s, '**', '**');
+        if (tag === 'I' || tag === 'EM' || sty.fontStyle === 'italic') s = wrapInl(s, '_', '_');
+        if ((tag === 'U' || tag === 'INS' || /underline/.test(deco)) && !inLink && tag !== 'A') s = wrapInl(s, '++', '++');
+        if (tag === 'S' || tag === 'STRIKE' || tag === 'DEL' || /line-through/.test(deco)) s = wrapInl(s, '~~', '~~');
+        if (tag === 'MARK') s = wrapInl(s, '==', '==');
+        const col = sty.color ? rgbHex(sty.color) : null;
+        const bg = sty.backgroundColor ? rgbHex(sty.backgroundColor) : null;
+        const attrs = [col && col !== 'transparent' ? col : '', bg && bg !== 'transparent' ? 'bg:' + bg : ''].filter(Boolean).join(' ');
+        if (tag === 'A') {
+          const href = PK.safeUrl(ch.getAttribute('href') || ch.getAttribute('data-href') || '');
+          const la = [attrs, /none/.test(deco) ? 'nu' : ''].filter(Boolean).join(' ');
+          if (href && s.trim()) s = `[${s}](${href.replace(/\)/g, '%29').replace(/\s/g, '%20')})${la ? `{${la}}` : ''}`;
+          else if (attrs && s.trim()) s = `[${s}]{${attrs}}`;
+        } else if (attrs && s.trim() && tag !== 'MARK') s = `[${s}]{${attrs}}`;
+        out += s;
+        if (block && !out.endsWith('\n')) out += '\n';
+      }
+      return out;
+    }
+    return walk(root, false)
+      .replace(/ *\n */g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/^\n+|\n+$/g, '');
+  };
 
   // ============================================================ THUỘC TÍNH
   const C = (label, x) => Object.assign({ type: 'color', label }, x);
@@ -127,6 +395,16 @@
   const E = (label, options, x) => Object.assign({ type: 'enum', label, options }, x);
   const B = (label, x) => Object.assign({ type: 'bool', label }, x);
   const T = (label, x) => Object.assign({ type: 'text', label, max: 300 }, x);
+  const L = (label, x) => Object.assign({ type: 'len', label, min: -5000, max: 5000 }, x);
+  const posOn = (P) => P.pos === 'absolute' || P.pos === 'fixed';
+  const animOn = (P) => !!P.anim && P.anim !== 'none';
+  const ANIM_OPTS = [
+    ['none', 'Không'], ['fade', 'Hiện dần'], ['up', 'Trượt lên'], ['down', 'Trượt xuống'], ['left', 'Trượt từ phải vào'], ['right', 'Trượt từ trái vào'],
+    ['zoom', 'Phóng to dần'], ['zoom-out', 'Thu nhỏ dần'], ['flip', 'Lật ra'], ['bounce', 'Nảy'], ['pulse', 'Nhịp đập'], ['shake', 'Rung'], ['spin', 'Xoay tròn'],
+    ['float', 'Bồng bềnh'], ['custom', 'Tuỳ chỉnh (khung hình)'],
+  ];
+  const ENTRANCE = new Set(['fade', 'up', 'down', 'left', 'right', 'zoom', 'zoom-out', 'flip']);
+  const EASE = { ease: 'ease', linear: 'linear', 'ease-in': 'ease-in', 'ease-out': 'ease-out', 'ease-in-out': 'ease-in-out', spring: 'cubic-bezier(.34,1.56,.64,1)' };
   const SHADOW_OPTS = [['none', 'Không'], ['sm', 'Nhẹ'], ['md', 'Vừa'], ['lg', 'Đậm']];
   const LINE_OPTS = [['solid', 'Liền'], ['dashed', 'Gạch'], ['dotted', 'Chấm']];
   const isSubmit = (P, t) => t !== 'button' || P.action === 'submit';
@@ -147,12 +425,14 @@
   const F = {
     // ---- nền
     bg: C('Màu nền', { none: true }),
+    bgGrad: { type: 'gradient', label: 'Màu chuyển sắc (gradient)', hint: 'Phủ lên màu nền; có ảnh nền thì nằm trên ảnh (dùng màu trong suốt để làm lớp phủ)' },
     bgImage: { type: 'image', label: 'Ảnh nền' },
     bgSize: E('Cách phủ ảnh nền', [['cover', 'Phủ kín'], ['contain', 'Vừa khung'], ['repeat', 'Lặp lại']], { ui: 'seg', show: (P) => !!P.bgImage }),
     bgOverlay: N('Làm tối ảnh nền', 0, 90, { unit: '%', ui: 'range', show: (P) => !!P.bgImage, hint: 'Giúp chữ trên ảnh dễ đọc hơn' }),
     // ---- chữ
     color: C('Màu chữ'),
-    font: E('Font chữ', null, { optionsFn: () => [['', 'Theo trang']].concat(Object.entries(FONTS).map(([k, f]) => [k, f.name])) }),
+    textGrad: { type: 'gradient', label: 'Chữ màu chuyển sắc', hint: 'Thay cho màu chữ' },
+    font: { type: 'font', label: 'Font chữ' },
     fontSize: N('Cỡ chữ', 8, 160, { unit: 'px' }),
     bold: B('Đậm'),
     italic: B('Nghiêng'),
@@ -180,6 +460,33 @@
     // ---- hiển thị
     hideMobile: B('Ẩn trên điện thoại'),
     hideDesktop: B('Ẩn trên máy tính & máy tính bảng'),
+    // ---- vị trí tự do, lớp chồng, xoay
+    pos: E('Cách đặt', [['flow', 'Theo bố cục'], ['absolute', 'Tự do trong khung'], ['fixed', 'Cố định trên màn hình']], {
+      ui: 'seg',
+      hint: 'Tự do: đặt theo khoảng cách tới mép khung chứa, nằm chồng lên thành phần khác · Cố định: đứng yên khi cuộn trang',
+    }),
+    posTop: L('Cách mép trên', { show: posOn }),
+    posRight: L('Cách mép phải', { show: posOn }),
+    posBottom: L('Cách mép dưới', { show: posOn }),
+    posLeft: L('Cách mép trái', { show: posOn }),
+    zIndex: N('Lớp chồng (số lớn nằm trên)', -100, 9999, { hint: 'Âm: nằm dưới nội dung của khung chứa (vd lớp phủ, hình trang trí)' }),
+    shiftX: L('Dịch ngang', { hint: 'vd -50% để căn giữa theo chiều ngang khi đặt tự do' }),
+    shiftY: L('Dịch dọc'),
+    rotate: N('Xoay', -360, 360, { unit: '°', ui: 'range' }),
+    anchorId: { type: 'anchor', label: 'Mã neo (để liên kết cuộn tới)', placeholder: 'vd: bang-gia', hint: 'Nút / liên kết có địa chỉ #bang-gia sẽ cuộn tới đây' },
+    // ---- chuyển động
+    anim: E('Hiệu ứng', ANIM_OPTS),
+    animOn: E('Bắt đầu khi', [['load', 'Mở trang'], ['scroll', 'Cuộn tới']], { ui: 'seg', show: animOn }),
+    animDur: N('Thời gian chạy', 50, 30000, { unit: 'ms', show: animOn }),
+    animDelay: N('Chờ trước khi chạy', 0, 30000, { unit: 'ms', show: animOn }),
+    animEase: E('Nhịp', [['ease', 'Mượt'], ['ease-out', 'Nhanh rồi chậm'], ['ease-in', 'Chậm rồi nhanh'], ['ease-in-out', 'Chậm – nhanh – chậm'], ['linear', 'Đều'], ['spring', 'Bật nảy']], { show: animOn }),
+    animLoop: B('Lặp lại liên tục', { show: animOn }),
+    animAlt: B('Chạy xuôi rồi ngược', { show: (P) => animOn(P) && P.animLoop }),
+    animFrames: { type: 'frames', label: 'Khung hình', show: (P) => P.anim === 'custom' },
+    // ---- hình trang trí
+    w: L('Chiều rộng', { min: 0, opt: true, hint: 'Số = px; có thể ghi 50% · để trống = tự động' }),
+    h: L('Chiều cao', { min: 0, opt: true }),
+    round: B('Bo tròn hẳn (hình tròn / viên thuốc)'),
     // ---- bố cục
     tag: E('Vai trò của khối', [['header', 'Phần đầu trang'], ['nav', 'Thanh điều hướng'], ['main', 'Nội dung chính'], ['section', 'Mục nội dung'], ['article', 'Bài viết'], ['aside', 'Thông tin bên lề'], ['footer', 'Chân trang'], ['div', 'Khối chung']], { hint: 'Giúp công cụ tìm kiếm & trình đọc màn hình hiểu trang' }),
     contentW: N('Bề rộng phần nội dung', 0, 3000, { unit: 'px', hint: 'Nội dung nằm giữa và không rộng quá giá trị này · 0 = tràn hết' }),
@@ -204,7 +511,7 @@
     width: N('Giá trị độ rộng', 1, 4000, { unitFn: (P) => (P.widthMode === 'percent' ? '%' : 'px'), show: (P) => P.widthMode === 'percent' || P.widthMode === 'fixed' }),
     place: E('Vị trí trong khung chứa', [['auto', 'Theo khung'], ['start', 'Trái'], ['center', 'Giữa'], ['end', 'Phải']], { ui: 'seg', show: (P, t, c) => !(c && c.inRow) && P.widthMode !== 'full' }),
     // ---- nội dung chữ
-    text: { type: 'area', label: 'Nội dung', max: 20000, rows: 3, uiFor: { button: 'text' } },
+    text: { type: 'area', label: 'Nội dung', max: 20000, rows: 3, rich: true, uiFor: { button: 'text' } },
     level: E('Cỡ tiêu đề', [['1', 'H1 · Rất lớn'], ['2', 'H2 · Lớn'], ['3', 'H3 · Vừa'], ['4', 'H4 · Nhỏ'], ['5', 'H5 · Rất nhỏ'], ['6', 'H6 · Nhỏ nhất']], { hint: 'Mỗi trang nên có đúng một H1' }),
     // ---- nút bấm
     icon: T('Biểu tượng (emoji hoặc ký tự)', { max: 8, placeholder: 'vd: → ☰ ✓ 🚀' }),
@@ -230,7 +537,7 @@
     height: N('Chiều cao', 0, 3000, { unit: 'px', hint: '0 = tự động theo tỉ lệ ảnh' }),
     fit: E('Khi ảnh khác tỉ lệ khung', [['cover', 'Phủ kín (cắt bớt)'], ['contain', 'Hiện trọn (không cắt)']], { ui: 'seg', show: (P) => P.height > 0 }),
     // ---- danh sách
-    items: { type: 'lines', label: 'Các mục (mỗi dòng một mục)', rows: 5 },
+    items: { type: 'lines', label: 'Các mục (mỗi dòng một mục)', rows: 5, rich: true },
     marker: E('Ký hiệu đầu dòng', [['disc', '● Chấm'], ['number', '1. Số'], ['check', '✓ Tích'], ['none', 'Không']], { ui: 'seg' }),
     // ---- bảng
     rows: { type: 'table', label: 'Dữ liệu' },
@@ -287,7 +594,7 @@
     bgSize: F.bgSize,
   };
   PK.THEME_FIELDS = {
-    font: E('Font chữ chung', Object.entries(FONTS).map(([k, f]) => [k, f.name])),
+    font: { type: 'font', label: 'Font chữ chung', noInherit: true },
     fontSize: N('Cỡ chữ cơ bản', 10, 28, { unit: 'px' }),
     color: C('Màu chữ chung'),
     primary: C('Màu chủ đạo', { hint: 'Màu mặc định của nút, dấu tích, viền ô đang nhập…' }),
@@ -305,12 +612,14 @@
 
   // ============================================================ THÀNH PHẦN
   const G = (id, title, keys, open) => ({ id, title, keys, open: !!open });
-  const BG = G('bg', 'Nền', ['bg', 'bgImage', 'bgSize', 'bgOverlay']);
+  const BG = G('bg', 'Nền', ['bg', 'bgGrad', 'bgImage', 'bgSize', 'bgOverlay']);
   const BOX = G('box', 'Viền, bo góc & bóng', ['borderW', 'borderColor', 'borderStyle', 'radius', 'shadow']);
   const SPACE = G('space', 'Khoảng cách', ['padY', 'padX', 'marginY', 'maxW']);
   const INNER = G('inner', 'Chữ bên trong', ['font', 'fontSize', 'color', 'align']);
-  const TEXT = G('text', 'Chữ', ['font', 'fontSize', 'color', 'STYLE', 'align', 'lineHeight', 'letterSpacing'], true);
-  const TBOX = G('tbox', 'Nền & khoảng cách', ['bg', 'radius', 'padY', 'padX', 'marginY', 'maxW']);
+  const TEXT = G('text', 'Chữ', ['font', 'fontSize', 'color', 'textGrad', 'STYLE', 'align', 'lineHeight', 'letterSpacing'], true);
+  const TBOX = G('tbox', 'Nền & khoảng cách', ['bg', 'bgGrad', 'radius', 'padY', 'padX', 'marginY', 'maxW']);
+  const POS = G('pos', 'Vị trí tự do, lớp chồng & xoay', ['pos', 'posTop', 'posRight', 'posBottom', 'posLeft', 'zIndex', 'shiftX', 'shiftY', 'rotate', 'anchorId']);
+  const ANIM = G('anim', 'Chuyển động', ['ANIM']);
   const FX = G('fx', 'Hiệu ứng khi di chuột qua / khi bấm', ['FX']);
   const VIS = G('vis', 'Hiển thị', ['opacity', 'hideMobile', 'hideDesktop']);
   const MARGIN = G('space', 'Khoảng cách', ['marginY']);
@@ -372,7 +681,7 @@
       desc: 'Nút để chuyển trang, mở menu hoặc gửi biểu mẫu / chạy chức năng',
       groups: [
         G('content', 'Nội dung', ['text', 'icon', 'iconPos'], true),
-        G('format', 'Định dạng', ['variant', 'size', 'bg', 'color', 'borderW', 'borderColor', 'borderStyle', 'font', 'fontSize', 'STYLE', 'letterSpacing', 'align', 'widthMode', 'width', 'place', 'padY', 'padX', 'radius', 'shadow'], true),
+        G('format', 'Định dạng', ['variant', 'size', 'bg', 'bgGrad', 'color', 'borderW', 'borderColor', 'borderStyle', 'font', 'fontSize', 'STYLE', 'letterSpacing', 'align', 'widthMode', 'width', 'place', 'padY', 'padX', 'radius', 'shadow'], true),
         G('action', 'Loại nút – khi bấm', ['action', 'linkKind', 'page', 'url', 'newTab', 'menu', 'submitKind', 'func', 'message'], true),
         G('fx', 'Hiệu ứng khi di chuột qua / khi bấm', ['FX']),
         MARGIN,
@@ -456,17 +765,39 @@
       groups: [G('field', 'Ô đánh dấu', ['label', 'checked', 'required', 'fieldName'], true), G('ffmt', 'Chữ', ['color', 'fontSize']), MARGIN, VIS],
       def: () => ({ label: 'Tôi đồng ý với điều khoản sử dụng', checked: false, required: false, fieldName: '' }),
     },
+    shape: {
+      name: 'Hình trang trí', cat: 'content', textual: true,
+      desc: 'Khối hình chữ nhật / tròn / viên thuốc để trang trí, làm nhãn, huy hiệu, lớp phủ…; đặt tự do, xoay, chuyển sắc được',
+      groups: [
+        G('shape', 'Hình', ['w', 'h', 'round', 'text', 'place'], true),
+        G('bg', 'Nền', ['bg', 'bgGrad', 'bgImage', 'bgSize', 'bgOverlay'], true),
+        G('box', 'Viền, bo góc & bóng', ['borderW', 'borderColor', 'borderStyle', 'radius', 'shadow']),
+        G('text', 'Chữ bên trong', ['font', 'fontSize', 'color', 'textGrad', 'STYLE', 'align', 'lineHeight', 'letterSpacing']),
+        G('space', 'Khoảng cách', ['padY', 'padX', 'marginY']),
+        FX,
+        VIS,
+      ],
+      def: () => ({ text: '', w: 120, h: 120, round: false, bg: '#dbeafe', radius: 12, align: 'center', lineHeight: 1.3, place: 'auto' }),
+    },
   };
   const STYLE_KEYS = ['bold', 'italic', 'underline', 'upper'];
   const FX_KEYS = Object.keys(fxFields('hover')).concat(Object.keys(fxFields('press')), ['speed']);
+  const ANIM_KEYS = ['anim', 'animOn', 'animDur', 'animDelay', 'animEase', 'animLoop', 'animAlt', 'animFrames'];
   PK.STYLE_KEYS = STYLE_KEYS;
   PK.FX_KEYS = FX_KEYS;
-  for (const t of Object.values(TYPES)) {
+  PK.ANIM_KEYS = ANIM_KEYS;
+  for (const [type, t] of Object.entries(TYPES)) {
+    // menu do runtime đặt chỗ (cạnh nút / phủ toàn trang) -> không có vị trí tự do & chuyển động
+    if (type !== 'menu') {
+      const vi = t.groups.findIndex((g) => g.id === 'vis');
+      t.groups.splice(vi < 0 ? t.groups.length : vi, 0, ANIM, POS);
+    }
     t.keys = new Set();
     for (const g of t.groups)
       for (const k of g.keys) {
         if (k === 'STYLE') STYLE_KEYS.forEach((x) => t.keys.add(x));
         else if (k === 'FX') FX_KEYS.forEach((x) => t.keys.add(x));
+        else if (k === 'ANIM') ANIM_KEYS.forEach((x) => t.keys.add(x));
         else t.keys.add(k);
       }
   }
@@ -477,6 +808,7 @@
     opacity: 100, borderW: 0, borderStyle: 'solid', radius: 0, shadow: 'none', padY: 0, padX: 0, marginY: 0, maxW: 0,
     bgSize: 'cover', bgOverlay: 0, speed: 'normal', hideMobile: false, hideDesktop: false,
     bold: false, italic: false, underline: false, upper: false, letterSpacing: 0,
+    pos: 'flow', rotate: 0, anim: 'none', animOn: 'load', animDur: 700, animDelay: 0, animEase: 'ease', animLoop: false, animAlt: false, round: false,
   };
   /** Thuộc tính đầy đủ (mặc định + giá trị người dùng). null = người dùng tắt hẳn */
   PK.resolve = function (n, theme) {
@@ -563,8 +895,143 @@
         });
         return ok(rows.length ? rows : [['']]);
       }
+      case 'len': {
+        const lo = f.min == null ? -5000 : f.min, hi = f.max == null ? 5000 : f.max;
+        if (typeof v === 'string' && /^\s*-?\d+(\.\d+)?\s*$/.test(v)) v = Number(v);
+        if (typeof v === 'number') return isFinite(v) ? ok(Math.round(DE.clamp(v, lo, hi) * 100) / 100) : BAD;
+        if (typeof v !== 'string') return BAD;
+        const m = v.trim().toLowerCase().match(LEN_RE);
+        if (!m) return BAD;
+        const x = Math.round(DE.clamp(Number(m[1]), m[2] === 'px' ? lo : Math.max(lo, -1000), m[2] === 'px' ? hi : 1000) * 100) / 100;
+        return ok(m[2] === 'px' ? x : x + m[2]);
+      }
+      case 'gradient': {
+        if (!v || typeof v !== 'object' || !Array.isArray(v.stops)) return BAD;
+        const kind = ['linear', 'radial', 'conic'].includes(v.kind) ? v.kind : 'linear';
+        const stops = [];
+        for (const s of v.stops.slice(0, 10)) {
+          const c = s && typeof s === 'object' ? s.c || s.color : s;
+          if (!isColor(c)) continue;
+          const p = s && s.p != null && s.p !== '' && isFinite(+s.p) ? Math.round(DE.clamp(+s.p, -100, 200) * 10) / 10 : null;
+          stops.push({ c: c.trim().toLowerCase(), p });
+        }
+        if (stops.length < 2) return BAD;
+        const g = { kind, stops };
+        if (kind !== 'radial') g.angle = isFinite(+v.angle) && v.angle !== '' && v.angle != null ? Math.round(DE.clamp(+v.angle, -360, 720)) : 180;
+        if (kind !== 'linear') g.at = GRAD_AT.includes(v.at) ? v.at : 'center';
+        if (kind === 'radial') g.shape = v.shape === 'circle' ? 'circle' : 'ellipse';
+        return ok(g);
+      }
+      case 'frames': {
+        if (!Array.isArray(v)) return BAD;
+        const num = (x, a, b) => (x != null && x !== '' && isFinite(+x) ? Math.round(DE.clamp(+x, a, b) * 100) / 100 : undefined);
+        const out = [];
+        for (const fr of v.slice(0, 16)) {
+          if (!fr || typeof fr !== 'object') continue;
+          const at = num(fr.at, 0, 100);
+          if (at === undefined) continue;
+          const o = { at };
+          const put = (k, val) => val !== undefined && (o[k] = val);
+          put('opacity', num(fr.opacity, 0, 100));
+          put('x', num(fr.x, -5000, 5000));
+          put('y', num(fr.y, -5000, 5000));
+          put('scale', num(fr.scale, 0, 1000));
+          put('rotate', num(fr.rotate, -3600, 3600));
+          if (isColor(fr.color)) o.color = fr.color.trim().toLowerCase();
+          if (isColor(fr.bg)) o.bg = fr.bg.trim().toLowerCase();
+          out.push(o);
+        }
+        out.sort((a, b) => a.at - b.at);
+        return out.length >= 2 ? ok(out) : BAD;
+      }
+      case 'font':
+        if (v === '' && !f.noInherit) return ok('');
+        return typeof v === 'string' && (FONTS[v] || /^cf-[a-z0-9-]{1,40}$/.test(v)) ? ok(v) : BAD;
+      case 'anchor': {
+        if (v === '') return ok('');
+        const s = PK.slug(v, 60);
+        return s ? ok(s) : BAD;
+      }
     }
     return BAD;
+  };
+
+  // ============================================================ FONT RIÊNG CỦA DỰ ÁN
+  // proj.fonts: [{ id:"cf-…", name, family, google?:{ weights:[400,700], italic }, faces?:[{ src, weight, style }] }]
+  const FAMILY_RE = /^[A-Za-z0-9][A-Za-z0-9 _.-]{0,59}$/;
+  PK.fontId = (family) => 'cf-' + (PK.slug(family, 40) || 'font');
+  function cleanFonts(arr, fixed) {
+    const out = [];
+    const ids = new Set();
+    for (const f of (Array.isArray(arr) ? arr : []).slice(0, 30)) {
+      if (!f || typeof f !== 'object') continue;
+      const family = typeof f.family === 'string' ? f.family.trim().replace(/\s+/g, ' ') : '';
+      if (!FAMILY_RE.test(family)) {
+        fixed.push(`Font ${show(f.family)}: tên họ font không hợp lệ → bỏ`);
+        continue;
+      }
+      let id = typeof f.id === 'string' && /^cf-[a-z0-9-]{1,40}$/.test(f.id) ? f.id : PK.fontId(family);
+      if (ids.has(id)) {
+        let k = 2;
+        while (ids.has(`${id}-${k}`)) k++;
+        id = `${id}-${k}`;
+      }
+      ids.add(id);
+      const o = { id, name: typeof f.name === 'string' && f.name.trim() ? cleanStr(f.name.trim(), 60) : family, family };
+      if (f.google) {
+        const g = f.google === true ? {} : f.google;
+        const ws = (Array.isArray(g.weights) ? g.weights : []).map(Number).filter((w) => Number.isInteger(w) && w >= 100 && w <= 900 && w % 100 === 0);
+        o.google = { weights: [...new Set(ws)].sort((a, b) => a - b).slice(0, 9), italic: !!g.italic };
+      }
+      const faces = [];
+      for (const fc of (Array.isArray(f.faces) ? f.faces : []).slice(0, 18)) {
+        const src = fc && PK.safeFont(fc.src);
+        if (!src) continue;
+        const w = String(fc.weight == null ? '400' : fc.weight).trim();
+        faces.push({ src, weight: /^\d{1,4}( \d{1,4})?$/.test(w) ? w : '400', style: fc.style === 'italic' ? 'italic' : 'normal' });
+      }
+      if (faces.length) o.faces = faces;
+      if (!o.google && !o.faces) {
+        fixed.push(`Font "${family}": không có nguồn (Google Fonts hoặc file font) → bỏ`);
+        ids.delete(id);
+        continue;
+      }
+      out.push(o);
+    }
+    return out;
+  }
+  PK.cleanFonts = (arr) => cleanFonts(arr, []);
+  /** CSS font-family của một khoá font (có sẵn hoặc font riêng của dự án) */
+  function fontFamily(key, proj) {
+    if (!key) return null;
+    if (FONTS[key]) return FONTS[key].css;
+    const f = proj && (proj.fonts || []).find((x) => x.id === key);
+    return f ? `"${f.family}", ${SYS}` : null;
+  }
+  PK.fontFamily = fontFamily;
+  /** Các khoá font (có sẵn + của dự án) để chọn trong bảng thuộc tính */
+  PK.fontOptions = (proj, inherit) =>
+    (inherit ? [['', 'Theo trang']] : [])
+      .concat(Object.entries(FONTS).map(([k, f]) => [k, f.name]))
+      .concat(((proj && proj.fonts) || []).map((f) => [f.id, f.name + ' (font riêng)']));
+  /** Font cần tải cho các khoá đang dùng: { links:[URL Google Fonts], css: "@font-face…" } */
+  PK.fontAssets = function (proj, keys) {
+    const links = [];
+    const builtin = keys.map((k) => FONTS[k] && FONTS[k].google).filter(Boolean);
+    if (builtin.length) links.push('https://fonts.googleapis.com/css2?family=' + [...new Set(builtin)].join('&family=') + '&display=swap');
+    let css = '';
+    for (const f of (proj && proj.fonts) || []) {
+      if (!keys.includes(f.id)) continue;
+      if (f.google) {
+        const fam = f.family.replace(/ /g, '+');
+        // không rõ độ đậm -> chỉ xin bản thường (xin độ đậm mà font không có thì Google trả lỗi cho cả liên kết)
+        const ws = f.google.weights;
+        const spec = !ws.length ? (f.google.italic ? ':ital@0;1' : '') : f.google.italic ? ':ital,wght@' + [0, 1].flatMap((it) => ws.map((w) => `${it},${w}`)).join(';') : ':wght@' + ws.join(';');
+        links.push(`https://fonts.googleapis.com/css2?family=${fam}${spec}&display=swap`);
+      }
+      for (const fc of f.faces || []) css += `@font-face{font-family:"${f.family}";src:${cssUrl(fc.src)};font-weight:${fc.weight};font-style:${fc.style};font-display:swap}\n`;
+    }
+    return { links, css };
   };
 
   // ============================================================ CHUẨN HOÁ DỰ ÁN
@@ -594,6 +1061,8 @@
       pages: [],
       script: typeof src.script === 'string' ? src.script.slice(0, 100000) : '',
     };
+    const fonts = cleanFonts(src.fonts, fixed);
+    if (fonts.length) proj.fonts = fonts;
     const th = src.theme && typeof src.theme === 'object' ? src.theme : {};
     for (const [k, f] of Object.entries(PK.THEME_FIELDS)) {
       if (th[k] === undefined) continue;
@@ -709,8 +1178,26 @@
   /** Tham chiếu trang / menu: chấp nhận id, đường dẫn hoặc tên (AI hay dùng) -> đổi về id; không tìm thấy -> bỏ */
   function fixRefs(proj, fixed) {
     const menus = PK.menus(proj);
+    const fontIds = new Set((proj.fonts || []).map((f) => f.id));
+    if (/^cf-/.test(proj.theme.font) && !fontIds.has(proj.theme.font)) {
+      fixed.push(`Giao diện chung: không có font riêng "${proj.theme.font}" → font mặc định`);
+      proj.theme.font = THEME_DEF.font;
+    }
+    const anchors = new Map(); // trang -> mã neo đã dùng
     PK.walkProject(proj, (n, parent, page) => {
       const p = n.props;
+      if (p.font && /^cf-/.test(p.font) && !fontIds.has(p.font)) {
+        fixed.push(`Trang "${page.name}" › ${TYPES[n.type].name}: không có font riêng "${p.font}" → theo trang`);
+        delete p.font;
+      }
+      if (p.anchorId) {
+        if (!anchors.has(page.id)) anchors.set(page.id, new Set());
+        const used = anchors.get(page.id);
+        if (used.has(p.anchorId)) {
+          fixed.push(`Trang "${page.name}": mã neo "${p.anchorId}" bị trùng → bỏ ở thành phần sau`);
+          delete p.anchorId;
+        } else used.add(p.anchorId);
+      }
       if (n.type !== 'button') return;
       if (p.page) {
         const pg = proj.pages.find((x) => x.id === p.page) || proj.pages.find((x) => x.path === PK.slug(p.page) || x.name === p.page);
@@ -806,9 +1293,50 @@
   const TXT = { left: 'flex-start', center: 'center', right: 'flex-end', justify: 'center' };
   const CELL_PAD = { sm: '6px 10px', md: '10px 14px', lg: '14px 20px' };
 
-  function bgImage(P) {
-    const o = P.bgOverlay > 0 ? P.bgOverlay / 100 : 0;
-    return (o ? `linear-gradient(rgba(0,0,0,${o}),rgba(0,0,0,${o})),` : '') + cssUrl(P.bgImage);
+  /** Nền nhiều lớp: lớp làm tối ảnh · màu chuyển sắc · ảnh nền */
+  function bgLayers(P, K, d) {
+    const img = K.has('bgImage') && P.bgImage;
+    const grad = K.has('bgGrad') && P.bgGrad ? gradCss(P.bgGrad) : '';
+    const o = img && P.bgOverlay > 0 ? P.bgOverlay / 100 : 0;
+    const layers = [], size = [], rep = [];
+    if (o) layers.push(`linear-gradient(rgba(0,0,0,${o}),rgba(0,0,0,${o}))`), size.push('auto'), rep.push('no-repeat');
+    if (grad) layers.push(grad), size.push('auto'), rep.push('no-repeat');
+    if (img) layers.push(cssUrl(P.bgImage)), size.push(P.bgSize === 'repeat' ? 'auto' : P.bgSize), rep.push(P.bgSize === 'repeat' ? 'repeat' : 'no-repeat');
+    if (!layers.length) return;
+    d['background-image'] = layers.join(',');
+    if (img) Object.assign(d, { 'background-size': size.join(','), 'background-repeat': rep.join(','), 'background-position': 'center' });
+  }
+  /** @keyframes cho chuyển động tuỳ chỉnh */
+  function framesCss(name, frames) {
+    return (
+      `@keyframes ${name}{` +
+      frames
+        .map((f) => {
+          const d = {};
+          if (f.opacity != null) d.opacity = f.opacity / 100;
+          const tr = [];
+          if (f.x || f.y) tr.push(`translate(${DE.f(f.x || 0)}px,${DE.f(f.y || 0)}px)`);
+          if (f.scale != null && f.scale !== 100) tr.push(`scale(${f.scale / 100})`);
+          if (f.rotate) tr.push(`rotate(${DE.f(f.rotate)}deg)`);
+          d.transform = tr.length ? tr.join(' ') : 'none';
+          if (f.color) d.color = f.color;
+          if (f.bg) d['background-color'] = f.bg;
+          return `${DE.f(f.at)}%{${decl(d)}}`;
+        })
+        .join('') +
+      '}'
+    );
+  }
+  /** Giá trị "animation" của thành phần, '' nếu không có */
+  function animValue(n, P) {
+    if (!P.anim || P.anim === 'none') return '';
+    let name = 'pg-k-' + P.anim;
+    if (P.anim === 'custom') {
+      if (!Array.isArray(P.animFrames) || P.animFrames.length < 2) return '';
+      name = 'k-' + n.id;
+    }
+    const fill = P.animLoop ? 'none' : ENTRANCE.has(P.anim) ? 'backwards' : P.anim === 'custom' ? 'both' : 'none';
+    return `${name} ${Math.round(P.animDur)}ms ${EASE[P.animEase] || 'ease'} ${Math.round(P.animDelay)}ms ${P.animLoop ? 'infinite' : 1} ${P.animLoop && P.animAlt ? 'alternate' : 'normal'} ${fill}`;
   }
 
   /** Vị trí theo chiều ngang của nút / ảnh trong khung chứa dọc */
@@ -843,14 +1371,15 @@
     const rules = [];
     // ---- nền
     if (K.has('bg') && P.bg && P.bg !== 'transparent') d['background-color'] = P.bg;
-    if (K.has('bgImage') && P.bgImage) {
-      d['background-image'] = bgImage(P);
-      if (P.bgSize === 'repeat') d['background-repeat'] = 'repeat';
-      else Object.assign(d, { 'background-size': P.bgSize, 'background-position': 'center', 'background-repeat': 'no-repeat' });
-    }
+    bgLayers(P, K, d);
     // ---- chữ
     if (K.has('color') && P.color) d.color = P.color;
-    if (K.has('font') && P.font && FONTS[P.font]) d['font-family'] = FONTS[P.font].css;
+    if (K.has('font') && P.font) {
+      const ff = fontFamily(P.font, ctx.proj);
+      if (ff) d['font-family'] = ff;
+    }
+    if (K.has('textGrad') && P.textGrad)
+      rules.push(`${sel} .pg-tg{background-image:${gradCss(P.textGrad)};-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;-webkit-box-decoration-break:clone;box-decoration-break:clone}`);
     if (K.has('fontSize') && P.fontSize) d['font-size'] = px(P.fontSize);
     if (K.has('bold')) d['font-weight'] = P.bold ? 700 : 400;
     if (K.has('italic') && P.italic) d['font-style'] = 'italic';
@@ -981,6 +1510,46 @@
       case 'select':
         rules.push(`${sel} input,${sel} textarea,${sel} select{background:${P.fieldBg};border-color:${P.fieldBorder};border-radius:${px(P.fieldRadius)}}`);
         break;
+      case 'shape':
+        if (P.w != null && P.w !== '') d.width = lenCss(P.w);
+        if (P.h != null && P.h !== '') d.height = lenCss(P.h);
+        if (P.round) d['border-radius'] = '9999px';
+        d['justify-content'] = TXT[P.align] || 'center';
+        if (c.inRow) d.flex = '0 0 auto';
+        else if (P.pos === 'flow' && P.w != null && P.w !== '' && P.w !== '100%') {
+          // hình có độ rộng riêng: đặt theo "Vị trí trong khung chứa", mặc định theo căn chữ của khung
+          const a = selfAlign(P, c);
+          if (a) d['align-self'] = a;
+        }
+        break;
+    }
+
+    // ---- vị trí tự do · lớp chồng · dịch · xoay
+    if (K.has('pos')) {
+      if (P.pos === 'absolute' || P.pos === 'fixed') {
+        d.position = P.pos;
+        for (const s of ['Top', 'Right', 'Bottom', 'Left']) {
+          const v = P['pos' + s];
+          if (v != null && v !== '') d[s.toLowerCase()] = lenCss(v);
+        }
+        d['max-width'] = d['max-width'] || 'none';
+        if (P.pos === 'fixed' && P.zIndex == null) d['z-index'] = 40;
+        if (c.inRow) delete d.flex;
+      } else if (P.zIndex != null && !d.position) d.position = 'relative';
+      if (P.zIndex != null) d['z-index'] = P.zIndex;
+      if (P.shiftX || P.shiftY) d.translate = `${lenCss(P.shiftX || 0)} ${lenCss(P.shiftY || 0)}`;
+      if (P.rotate) d.rotate = DE.f(P.rotate) + 'deg';
+    }
+    // khung có thành phần con nằm dưới (lớp chồng âm): tạo ngữ cảnh xếp lớp riêng để con không chui xuống dưới nền của khung
+    if (n.children && n.children.some((ch) => ch.props && ch.props.zIndex < 0)) d.isolation = 'isolate';
+    // ---- chuyển động (khung soạn: chỉ chạy khi bấm "Xem chuyển động")
+    if (K.has('anim')) {
+      const av = animValue(n, P);
+      if (av) {
+        if (P.anim === 'custom') rules.push(framesCss('k-' + n.id, P.animFrames));
+        if (ctx.edit) rules.push(`.pg-ed-play${sel}{animation:${av}}`);
+        else d.animation = av;
+      }
     }
 
     // ---- hiệu ứng khi di chuột qua / khi bấm
@@ -1001,9 +1570,9 @@
     return rules;
   }
 
-  function themeCSS(theme) {
+  function themeCSS(theme, proj) {
     const th = PK.resolveTheme(theme);
-    return `:root{--pg-font:${(FONTS[th.font] || FONTS.system).css};--pg-size:${px(th.fontSize)};--pg-color:${th.color};--pg-primary:${th.primary}}`;
+    return `:root{--pg-font:${fontFamily(th.font, proj) || FONTS.system.css};--pg-size:${px(th.fontSize)};--pg-color:${th.color};--pg-primary:${th.primary}}`;
   }
   function pageCSS(pg) {
     const P = PK.resolvePage(pg);
@@ -1017,7 +1586,6 @@
   }
 
   // ============================================================ SINH HTML
-  const txt = (s) => esc(s).replace(/\n/g, '<br>');
   const autoName = (label) => PK.slug(label, 40).replace(/-/g, '_') || 'truong';
   const IMG_ICON = '<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6M15 9h.01"/></svg>';
   const EMPTY_HINT = {
@@ -1038,9 +1606,16 @@
     const P = PK.resolve(n, ctx.theme);
     const c = { parentType: parent.type, parentP: parent.P || {}, inRow: parent.type === 'row' || (parent.type === 'menu' && parent.P.dir === 'row') };
     for (const r of nodeCSS(n, P, ctx, c)) ctx.rules.push(r);
-    if (P.font && FONTS[P.font] && FONTS[P.font].google) ctx.fonts.add(P.font);
-    const ed = ctx.edit ? ` data-pid="${n.id}"` : '';
-    const cls = (base) => `class="${base} ${n.id}"`;
+    if (T.keys.has('font') && P.font && (FONTS[P.font] || /^cf-/.test(P.font))) ctx.fonts.add(P.font);
+    const K = T.keys;
+    const ed = (ctx.edit ? ` data-pid="${n.id}"` : '') + (!ctx.edit && K.has('anchorId') && P.anchorId ? ` id="${esc(P.anchorId)}"` : '');
+    // chuyển động "khi cuộn tới": runtime thêm .pg-in khi thành phần hiện trên màn hình
+    const more = !ctx.edit && K.has('anim') && P.animOn === 'scroll' && animValue(n, P) ? ' pg-a-sc' : '';
+    const cls = (base) => `class="${base} ${n.id}${more}"`;
+    const rich = (s) => {
+      const h = inlineHTML(s, ctx);
+      return K.has('textGrad') && P.textGrad && h ? `<span class="pg-tg">${h}</span>` : h;
+    };
     const kids = () => renderList(n.children, ctx, { type: n.type, P }) || (ctx.edit ? `<div class="pg-ed-empty">${EMPTY_HINT[n.type] || 'Kéo thành phần vào đây'}</div>` : '');
     switch (n.type) {
       case 'section':
@@ -1051,10 +1626,12 @@
         return `<div ${cls('pg-col')}${ed}>${kids()}</div>`;
       case 'heading': {
         const l = /^[1-6]$/.test(P.level) ? P.level : '2';
-        return `<h${l} ${cls('pg-heading')}${ed}>${txt(P.text)}</h${l}>`;
+        return `<h${l} ${cls('pg-heading')}${ed}>${rich(P.text)}</h${l}>`;
       }
       case 'text':
-        return `<p ${cls('pg-text')}${ed}>${txt(P.text)}</p>`;
+        return `<p ${cls('pg-text')}${ed}>${rich(P.text)}</p>`;
+      case 'shape':
+        return `<div ${cls('pg-shape')}${P.text ? '' : ' aria-hidden="true"'}${ed}>${rich(P.text)}</div>`;
       case 'button': {
         const ic = P.icon ? `<span class="pg-btn-icon" aria-hidden="true">${esc(P.icon)}</span>` : '';
         const inner = (P.iconPos === 'before' ? ic : '') + `<span class="pg-btn-text">${esc(P.text)}</span>` + (P.iconPos !== 'before' ? ic : '');
@@ -1077,12 +1654,12 @@
         return `<img ${cls('pg-img')} src="${esc(P.src)}" alt="${esc(P.alt)}"${ctx.edit ? '' : ' loading="lazy"'}${ed}>`;
       case 'list': {
         const tag = P.marker === 'number' ? 'ol' : 'ul';
-        const items = (P.items || []).map((s, i) => `<li${ctx.edit ? ` data-li="${i}"` : ''}>${esc(s)}</li>`).join('');
-        return `<${tag} class="pg-list m-${P.marker} ${n.id}"${ed}>${items || (ctx.edit ? '<li data-li="0"></li>' : '')}</${tag}>`;
+        const items = (P.items || []).map((s, i) => `<li${ctx.edit ? ` data-li="${i}"` : ''}>${rich(s)}</li>`).join('');
+        return `<${tag} class="pg-list m-${P.marker} ${n.id}${more}"${ed}>${items || (ctx.edit ? '<li data-li="0"></li>' : '')}</${tag}>`;
       }
       case 'table': {
         const rows = P.rows && P.rows.length ? P.rows : [['']];
-        const cell = (tag, v, r, ci) => `<${tag}${tag === 'th' ? ' scope="col"' : ''}${ctx.edit ? ` data-cell="${r},${ci}"` : ''}>${esc(v)}</${tag}>`;
+        const cell = (tag, v, r, ci) => `<${tag}${tag === 'th' ? ' scope="col"' : ''}${ctx.edit ? ` data-cell="${r},${ci}"` : ''}>${inlineHTML(v, ctx)}</${tag}>`;
         let h = '';
         let start = 0;
         if (P.header) {
@@ -1151,14 +1728,11 @@
     const ctx = { edit: !!opts.edit, openMenus: opts.openMenus || null, theme: PK.resolveTheme(proj.theme), proj, page, rules: [], fonts: new Set() };
     const html = renderList(page.children, ctx, { type: 'page', P: PK.resolvePage(page) });
     const th = ctx.theme;
-    if (FONTS[th.font] && FONTS[th.font].google) ctx.fonts.add(th.font);
+    if (th.font) ctx.fonts.add(th.font);
     return { html, css: pageCSS(page) + '\n' + ctx.rules.join('\n'), fonts: [...ctx.fonts] };
   };
   PK.themeCSS = themeCSS;
-  PK.fontsURL = (keys) => {
-    const fam = keys.map((k) => FONTS[k] && FONTS[k].google).filter(Boolean);
-    return fam.length ? 'https://fonts.googleapis.com/css2?family=' + fam.join('&family=') + '&display=swap' : '';
-  };
+  PK.fontsURL = (keys, proj) => PK.fontAssets(proj, keys).links[0] || '';
 
   PK.BASE_CSS = `*,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -1166,8 +1740,27 @@ body{font-family:var(--pg-font);font-size:var(--pg-size);color:var(--pg-color);l
 [hidden]{display:none!important}
 img{max-width:100%}
 h1,h2,h3,h4,h5,h6,p,ul,ol{margin:0}
-.pg-page{display:flex;flex-direction:column;min-height:100vh}
+.pg-page{display:flex;flex-direction:column;min-height:100vh;position:relative;isolation:isolate}
 .pg-section,.pg-col,.pg-form,.pg-field{display:flex;flex-direction:column;min-width:0}
+.pg-section,.pg-row,.pg-col,.pg-form{position:relative}
+.pg-shape{display:flex;align-items:center;justify-content:center;flex:0 0 auto;max-width:100%;overflow-wrap:break-word;position:relative}
+.pg-link{color:var(--pg-primary);text-decoration:underline;text-underline-offset:2px}
+.pg-page code{font-family:Consolas,"Courier New",monospace;font-size:.9em;padding:.1em .35em;border-radius:4px;background:rgba(127,127,127,.16)}
+.pg-page mark{padding:0 .15em;border-radius:3px}
+@keyframes pg-k-fade{from{opacity:0}}
+@keyframes pg-k-up{from{opacity:0;transform:translateY(40px)}}
+@keyframes pg-k-down{from{opacity:0;transform:translateY(-40px)}}
+@keyframes pg-k-left{from{opacity:0;transform:translateX(60px)}}
+@keyframes pg-k-right{from{opacity:0;transform:translateX(-60px)}}
+@keyframes pg-k-zoom{from{opacity:0;transform:scale(.8)}}
+@keyframes pg-k-zoom-out{from{opacity:0;transform:scale(1.2)}}
+@keyframes pg-k-flip{from{opacity:0;transform:perspective(600px) rotateX(-75deg)}}
+@keyframes pg-k-bounce{0%,20%,53%,100%{transform:none}40%,43%{transform:translateY(-24px)}70%{transform:translateY(-12px)}90%{transform:translateY(-4px)}}
+@keyframes pg-k-pulse{50%{transform:scale(1.06)}}
+@keyframes pg-k-shake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-8px)}40%,60%{transform:translateX(8px)}}
+@keyframes pg-k-spin{to{transform:rotate(360deg)}}
+@keyframes pg-k-float{50%{transform:translateY(-12px)}}
+.pg-a-sc:not(.pg-in){animation-play-state:paused!important}
 .pg-section{width:100%}
 .pg-row{display:flex;flex-direction:row;min-width:0}
 .pg-heading{line-height:1.25;overflow-wrap:break-word}
@@ -1200,7 +1793,7 @@ h1,h2,h3,h4,h5,h6,p,ul,ol{margin:0}
 .pg-menu-full.fx-slide-right{transform:translateX(100%)}
 .pg-menu.open{opacity:1;transform:none}
 .pg-menu-close{position:absolute;top:14px;right:16px;width:42px;height:42px;border:0;border-radius:50%;background:rgba(127,127,127,.2);color:inherit;font:28px/1 sans-serif;cursor:pointer}
-@media (prefers-reduced-motion:reduce){.pg-menu,.pg-btn{transition:none!important}}`;
+@media (prefers-reduced-motion:reduce){.pg-menu,.pg-btn{transition:none!important}.pg-page *:not(.pg-ed-play){animation:none!important}}`;
 
   /** CSS riêng của khung soạn (không có trong file xuất) */
   PK.EDIT_CSS = `html,body{background:#fff;overflow:hidden}
@@ -1220,16 +1813,20 @@ body.pg-edit{user-select:none;-webkit-user-select:none}
 .pg-outline [data-pid]{outline:1px dashed rgba(37,99,235,.45);outline-offset:-1px}
 .pg-outline .pg-menu{outline:2px dashed #a855f7}
 .pg-edit [contenteditable]{outline:2px solid #2563eb!important;outline-offset:2px;cursor:text;user-select:text;-webkit-user-select:text;min-width:1em}
-.pg-edit [contenteditable]:empty::before{content:""}`;
+.pg-edit [contenteditable]:empty::before{content:""}
+.pg-edit .pg-link{cursor:text}
+.pg-edit .pg-shape:empty{outline:1px dashed rgba(100,116,139,.35);outline-offset:-1px}`;
 
   // ============================================================ FILE HTML XUẤT
   // Chạy trong trang xuất ra: chuyển trang theo #/duong-dan, mở / đóng menu, gửi biểu mẫu.
   const RUNTIME = `(function(){
-var d=document,pages=[].slice.call(d.querySelectorAll('[data-page]'));
+var d=document,pages=[].slice.call(d.querySelectorAll('[data-page]')),cur=null;
 function q(s){return [].slice.call(d.querySelectorAll(s))}
-function show(slug){var t=null;pages.forEach(function(p){if(p.getAttribute('data-page')===slug)t=p});if(!t)t=pages[0];if(!t)return;closeAll();pages.forEach(function(p){p.hidden=p!==t});d.title=t.getAttribute('data-title')||d.title;window.scrollTo(0,0)}
-function route(){var m=location.hash.match(/^#\\/([\\w-]*)/);show(m?decodeURIComponent(m[1]):(window.PG_START||''))}
+function show(slug,keep){var t=null;pages.forEach(function(p){if(p.getAttribute('data-page')===slug)t=p});if(!t)t=pages[0];if(!t)return;closeAll();pages.forEach(function(p){p.hidden=p!==t});cur=t;d.title=t.getAttribute('data-title')||d.title;if(!keep)window.scrollTo(0,0)}
+function jump(id){var el=null;try{el=d.getElementById(id)}catch(e){}if(!el||!el.closest||el.closest('.pg-menu'))return false;var p=el.closest('[data-page]');if(p&&p!==cur)show(p.getAttribute('data-page'),1);var off=0;if(cur)[].forEach.call(cur.children,function(c){var s=getComputedStyle(c);if((s.position==='sticky'||s.position==='fixed')&&parseFloat(s.top)<=1&&c.offsetHeight<window.innerHeight/2)off=Math.max(off,c.offsetHeight)});window.scrollTo({top:el.getBoundingClientRect().top+window.pageYOffset-off,behavior:'smooth'});return true}
+function route(){var h=location.hash,m=h.match(/^#\\/([\\w-]*)/);if(m)return show(decodeURIComponent(m[1]));if(h.length>1&&jump(decodeURIComponent(h.slice(1))))return;if(!cur)show(window.PG_START||'')}
 window.addEventListener('hashchange',route);route();
+var A=q('.pg-a-sc');if(A.length){if('IntersectionObserver' in window){var io=new IntersectionObserver(function(es){es.forEach(function(x){if(x.isIntersecting){x.target.classList.add('pg-in');io.unobserve(x.target)}})},{threshold:.1});A.forEach(function(a){io.observe(a)})}else A.forEach(function(a){a.classList.add('pg-in')})}
 function place(m,b){var r=b.getBoundingClientRect(),w=m.offsetWidth,h=m.offsetHeight,a=m.getAttribute('data-anchor')||'below-left';var x=a==='below-right'?r.right-w:r.left,y=a==='above-left'?r.top-h-6:r.bottom+6;if(y<8)y=r.bottom+6;x=Math.max(8,Math.min(x,d.documentElement.clientWidth-w-8));m.style.left=(x+window.pageXOffset)+'px';m.style.top=(y+window.pageYOffset)+'px'}
 function open(m,b){if(!m._home){m._home=d.createComment('menu');m.parentNode.insertBefore(m._home,m)}d.body.appendChild(m);m.hidden=false;m._btn=b||null;if(b){b.setAttribute('aria-expanded','true');if(m.classList.contains('pg-menu-panel'))place(m,b)}void m.offsetWidth;m.classList.add('open');if(m.classList.contains('pg-menu-full')){var f=m.querySelector('a[href],button,input,select,textarea');if(f)try{f.focus({preventScroll:true})}catch(e){}}}
 function close(m){if(!m||!m.classList.contains('open'))return;m.classList.remove('open');if(m._btn)m._btn.setAttribute('aria-expanded','false');setTimeout(function(){if(m.classList.contains('open'))return;m.hidden=true;if(m._home&&m._home.parentNode){m._home.parentNode.insertBefore(m,m._home);m._home.parentNode.removeChild(m._home);m._home=null}},320)}
@@ -1239,6 +1836,7 @@ d.addEventListener('click',function(e){var t=e.target&&e.target.closest?e.target
 var ob=t.closest('[data-open-menu]');if(ob){e.preventDefault();var m=d.getElementById(ob.getAttribute('data-open-menu'));if(!m)return;if(m.classList.contains('open'))close(m);else{closeAll(m);open(m,ob)}return}
 var cb=t.closest('[data-close-menu]');if(cb){close(cb.closest('.pg-menu'));return}
 var lk=t.closest('a[href^="#/"]');if(lk&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&!e.button){e.preventDefault();var h=lk.getAttribute('href');if(location.hash===h)route();else location.hash=h}
+var an=t.closest('a[href^="#"]');if(an&&an!==lk){var ah=an.getAttribute('href');if(ah.length>1&&location.hash===ah){e.preventDefault();jump(decodeURIComponent(ah.slice(1)))}}
 var inM=t.closest('.pg-menu');q('.pg-menu.open').forEach(function(m){if(m!==inM&&m.hasAttribute('data-close-outside'))close(m)});
 var al=t.closest('[data-alert]');if(al)alert(al.getAttribute('data-alert'));
 var fc=t.closest('[data-call]');if(fc&&fc.tagName!=='FORM')call(fc.getAttribute('data-call'),fc,e);
@@ -1252,7 +1850,7 @@ d.addEventListener('submit',function(e){var f=e.target,k=f.getAttribute('data-su
 
   /** File HTML độc lập chứa mọi trang. opts.start: đường dẫn trang mở đầu (Xem thử) */
   PK.exportHTML = function (proj, opts = {}) {
-    const css = [PK.BASE_CSS, themeCSS(proj.theme)];
+    const css = [PK.BASE_CSS, themeCSS(proj.theme, proj)];
     const fonts = new Set();
     const pages = proj.pages.map((pg, i) => {
       const r = PK.renderPage(proj, pg, {});
@@ -1260,10 +1858,12 @@ d.addEventListener('submit',function(e){var f=e.target,k=f.getAttribute('data-su
       r.fonts.forEach((f) => fonts.add(f));
       return `<div class="pg-page ${pg.id}" data-page="${esc(pg.path)}" data-title="${esc(PK.pageTitle(proj, pg))}"${i ? ' hidden' : ''}>\n${r.html}\n</div>`;
     });
-    const url = PK.fontsURL([...fonts]);
-    const fontLink = url
-      ? `<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link rel="stylesheet" href="${esc(url)}">\n`
-      : '';
+    const fa = PK.fontAssets(proj, [...fonts]);
+    if (fa.css) css.splice(1, 0, fa.css.trim());
+    const fontLink =
+      (fa.links.length ? `<link rel="preconnect" href="https://fonts.googleapis.com">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n` : '') +
+      fa.links.map((u) => `<link rel="stylesheet" href="${esc(u)}">\n`).join('') +
+      '<noscript><style>.pg-a-sc{animation:none!important}</style></noscript>\n';
     const start = opts.start ? `<script>window.PG_START=${JSON.stringify(String(opts.start)).replace(/</g, '\\u003c')};</script>\n` : '';
     const user = proj.script && proj.script.trim() ? `<script>\n${safeScript(proj.script)}\n</script>\n` : '';
     return (
@@ -1305,11 +1905,19 @@ d.addEventListener('submit',function(e){var f=e.target,k=f.getAttribute('data-su
     contact: 'M4 4h16v16H4zM7 8h10M7 12h10M7 16h4',
     footer: 'M3 15h18v5H3zM5 17.5h5M14 17.5h5',
     pricing: 'M3 5h5v14H3zM9.5 3h5v18h-5zM16 5h5v14h-5z',
+    shape: 'M4 6h16v12H4zM8 6v12M4 10h4',
+    circle: 'M12 3a9 9 0 110 18 9 9 0 010-18zM8 12h8',
+    badge: 'M7 8h10a4 4 0 010 8H7a4 4 0 010-8zM10 12h4',
+    blob: 'M12 3c5 0 9 3 9 8s-4 10-9 10-9-4-9-9 4-9 9-9zM8 9l4 3',
   };
   PK.icon = (name, size = 22) =>
     `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICON[name] || ICON.section}"/></svg>`;
   PK.typeIcon = (n) =>
-    n.type === 'divider' ? ({ hr: 'hr', vr: 'vr', space: 'space' }[(n.props || {}).kind] || 'hr') : n.type === 'menu' ? ((n.props || {}).mode === 'full' ? 'menuFull' : 'menuPanel') : n.type === 'input' && (n.props || {}).inputType === 'textarea' ? 'textarea' : n.type;
+    n.type === 'shape'
+      ? (n.props || {}).round
+        ? 'circle'
+        : 'shape'
+      : n.type === 'divider' ? ({ hr: 'hr', vr: 'vr', space: 'space' }[(n.props || {}).kind] || 'hr') : n.type === 'menu' ? ((n.props || {}).mode === 'full' ? 'menuFull' : 'menuPanel') : n.type === 'input' && (n.props || {}).inputType === 'textarea' ? 'textarea' : n.type;
 
   const card = (title, body) =>
     mk('col', { bg: '#ffffff', radius: 12, padY: 24, padX: 24, borderW: 1, borderColor: '#e2e8f0', shadow: 'sm', hoverLift: 4, hoverShadow: 'md' }, [mk('heading', { text: title, level: '4' }), mk('text', { text: body, color: '#475569' })]);
@@ -1380,6 +1988,17 @@ d.addEventListener('submit',function(e){var f=e.target,k=f.getAttribute('data-su
       ],
     },
     { id: 'data', name: 'Dữ liệu', items: [{ key: 'table', icon: 'table', name: 'Bảng', build: () => [mk('table')] }] },
+    {
+      id: 'decor', name: 'Trang trí', items: [
+        { key: 'shape', icon: 'shape', name: 'Hình chữ nhật', build: () => [mk('shape')] },
+        { key: 'circle', icon: 'circle', name: 'Hình tròn', build: () => [mk('shape', { round: true, w: 96, h: 96, bg: '#fde68a' })] },
+        { key: 'badge', icon: 'badge', name: 'Nhãn', desc: 'Nhãn chữ nhỏ bo tròn (Mới, Giảm giá…)', build: () => [mk('shape', { text: 'Mới', w: null, h: null, round: true, bg: '#2563eb', color: '#ffffff', fontSize: 12, bold: true, padY: 4, padX: 12, upper: true, letterSpacing: 1 })] },
+        {
+          key: 'blob', icon: 'blob', name: 'Đốm màu chuyển sắc', desc: 'Hình tròn chuyển sắc đặt tự do phía sau nội dung – kéo vào một khối trang',
+          build: () => [mk('shape', { round: true, w: 320, h: 320, bg: 'transparent', bgGrad: { kind: 'radial', shape: 'circle', at: 'center', stops: [{ c: 'rgba(99,102,241,0.35)', p: 0 }, { c: 'rgba(99,102,241,0)', p: 70 }] }, pos: 'absolute', posTop: -80, posRight: -80, zIndex: -1 })],
+        },
+      ],
+    },
     {
       id: 'divider', name: 'Ngăn cách', items: [
         { key: 'hr', icon: 'hr', name: 'Thanh ngang', build: () => [mk('divider', { kind: 'hr' })] },
@@ -1472,10 +2091,21 @@ d.addEventListener('submit',function(e){var f=e.target,k=f.getAttribute('data-su
   };
 
   // ============================================================ SKILL CHO AI
-  const COMMON_KEYS = new Set(['bg', 'bgImage', 'bgSize', 'bgOverlay', 'color', 'font', 'fontSize', 'bold', 'italic', 'underline', 'upper', 'align', 'lineHeight', 'letterSpacing', 'padY', 'padX', 'marginY', 'maxW', 'borderW', 'borderColor', 'borderStyle', 'radius', 'shadow', 'opacity', 'hideMobile', 'hideDesktop', ...FX_KEYS]);
+  const POS_KEYS = ['pos', 'posTop', 'posRight', 'posBottom', 'posLeft', 'zIndex', 'shiftX', 'shiftY', 'rotate', 'anchorId'];
+  const COMMON_KEYS = new Set(['bg', 'bgGrad', 'bgImage', 'bgSize', 'bgOverlay', 'color', 'textGrad', 'font', 'fontSize', 'bold', 'italic', 'underline', 'upper', 'align', 'lineHeight', 'letterSpacing', 'padY', 'padX', 'marginY', 'maxW', 'borderW', 'borderColor', 'borderStyle', 'radius', 'shadow', 'opacity', 'hideMobile', 'hideDesktop', ...FX_KEYS, ...POS_KEYS, ...ANIM_KEYS]);
   function fieldDoc(k, t) {
     const f = F[k];
     switch (f.type) {
+      case 'len':
+        return `${k} (số px hoặc chuỗi "50%"/"10vw"/"2em")`;
+      case 'gradient':
+        return `${k} ({kind:"linear"|"radial"|"conic", angle, stops:[{c,p}]})`;
+      case 'frames':
+        return `${k} (mảng khung hình)`;
+      case 'font':
+        return `${k} (khoá font: ${Object.keys(FONTS).join('|')} hoặc id font riêng "cf-…")`;
+      case 'anchor':
+        return `${k} (mã neo chữ-thường-gạch-nối)`;
       case 'enum':
         return `${k}: ${PK.optionsOf(f, t).map((o) => (o[0] === '' ? '""' : o[0])).join('|')}`;
       case 'num':
@@ -1550,8 +2180,9 @@ d.addEventListener('submit',function(e){var f=e.target,k=f.getAttribute('data-su
     L.push('4. Khi sửa: giữ nguyên phần người dùng không yêu cầu đổi. Giá trị dạng `"@img:…"` là ảnh người dùng đã tải lên – giữ nguyên chuỗi đó.');
     L.push('');
     L.push('## Cấu trúc');
-    L.push('- Dự án: `{ "kind":"de-page", "version":1, "name", "theme":{ "font", "fontSize", "color", "primary" }, "pages":[…], "script":"" }`');
-    L.push(`- theme.font: ${Object.keys(FONTS).join('|')} · theme.primary: màu chủ đạo (nút mặc định dùng màu này).`);
+    L.push('- Dự án: `{ "kind":"de-page", "version":1, "name", "theme":{ "font", "fontSize", "color", "primary" }, "fonts":[…]?, "pages":[…], "script":"" }`');
+    L.push(`- theme.font: ${Object.keys(FONTS).join('|')} hoặc id font riêng · theme.primary: màu chủ đạo (nút mặc định dùng màu này).`);
+    L.push('- Font riêng (`fonts`, tuỳ chọn): `[{ "id":"cf-poppins", "name":"Poppins", "family":"Poppins", "google":{ "weights":[400,600,700], "italic":false } }]` (Google Fonts) hoặc `"faces":[{ "src":"https://…/font.woff2", "weight":"400", "style":"normal" }]`. Dùng bằng `font:"cf-poppins"`.');
     L.push('- Trang: `{ "id", "name", "path" (chữ-thường-gạch-nối, trang đầu là "index"), "props":{ "title", "bg", "bgImage", "bgSize" }, "children":[…] }`');
     L.push('- Thành phần: `{ "id" (duy nhất, bắt đầu bằng chữ cái), "type", "name"? (tên hiện trong bảng Lớp), "props":{…}, "children":[…] (chỉ loại chứa được con) }`');
     L.push('- Chỉ ghi props KHÁC mặc định. Màu dạng "#rrggbb" (hoặc "transparent", "rgba(…)"). Số đo là px trừ khi ghi khác (%, ×).');
@@ -1568,6 +2199,11 @@ d.addEventListener('submit',function(e){var f=e.target,k=f.getAttribute('data-su
     L.push('## Props chung');
     L.push(['bg', 'bgImage', 'bgSize', 'bgOverlay', 'color', 'font', 'fontSize', 'bold', 'italic', 'underline', 'upper', 'align', 'lineHeight', 'letterSpacing', 'padY', 'padX', 'marginY', 'maxW', 'borderW', 'borderColor', 'borderStyle', 'radius', 'shadow', 'opacity', 'hideMobile', 'hideDesktop'].map((k) => fieldDoc(k)).join(' · '));
     L.push('- Hiệu ứng: `hoverBg|hoverColor|hoverBorder` (màu; hoverBg/pressBg nhận "auto"), `hoverScale` (%), `hoverLift` (px nhấc lên), `hoverShadow` (none|sm|md|lg), `hoverOpacity` (%); tương tự với tiền tố `press` (khi bấm); `speed`: fast|normal|slow.');
+    L.push('- Màu chuyển sắc: `bgGrad` (nền, nằm trên ảnh nền) và `textGrad` (chữ): `{ "kind":"linear", "angle":135, "stops":[{"c":"#6366f1","p":0},{"c":"#ec4899","p":100}] }` · radial: `{ "kind":"radial", "shape":"circle", "at":"top right", "stops":[…] }`. Màu có thể là rgba(…) để làm lớp phủ trong suốt.');
+    L.push('- Vị trí tự do: `pos`: flow (mặc định) | absolute (theo khung chứa – mọi khung đều là mốc) | fixed (theo màn hình); `posTop|posRight|posBottom|posLeft`: số px hoặc "50%"; `zIndex` (âm = nằm dưới nội dung của khung, dùng cho hình trang trí / lớp phủ); `shiftX|shiftY` (dịch, vd "-50%"); `rotate` (độ). `anchorId`: mã neo để nút có url "#ma-neo" cuộn tới.');
+    L.push('- Chuyển động: `anim`: ' + ANIM_OPTS.map((o) => o[0]).join('|') + ' · `animOn`: load|scroll (khi cuộn tới) · `animDur`, `animDelay` (ms) · `animEase`: ' + Object.keys(EASE).join('|') + ' · `animLoop`, `animAlt` (true/false) · `anim:"custom"` + `animFrames`: `[{ "at":0, "opacity":0, "y":40 }, { "at":100, "opacity":100, "y":0 }]` (at %, opacity %, x/y px, scale %, rotate độ, color, bg).');
+    L.push('- Chữ có định dạng trong `text` (heading, text, shape), các mục `items` và ô bảng: `**đậm**`, `_nghiêng_`, `++gạch chân++`, `~~gạch ngang~~`, `==tô sáng==`, `` `mã` ``, liên kết `[chữ](https://…)` / `[chữ](#/duong-dan-trang)` / `[chữ](#ma-neo)`, màu `[chữ]{#e11d48}`, nền `[chữ]{bg:#fef08a}`; `\\*` để ghi dấu * thường. Xuống dòng bằng "\\n".');
+    L.push('- `shape` (Hình trang trí): khối có `w`/`h` (px hoặc %), `round`, nền / chuyển sắc / viền / bóng, chữ tuỳ chọn – dùng làm nhãn, huy hiệu, đốm màu, lớp phủ (kết hợp `pos:"absolute"`, `zIndex:-1`).');
     L.push('');
     L.push('## Quy tắc dựng trang');
     L.push('- Bố cục: `section` (dải ngang cả trang, nội dung căn giữa theo `contentW`) → `row` (xếp ngang) → `col` (xếp dọc; nhiều cột trong một hàng = chia cột) → nội dung. Trang thường có: header (thanh điều hướng) · hero · các section nội dung · footer.');
