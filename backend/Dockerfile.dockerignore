@@ -1,0 +1,7 @@
+# Ngữ cảnh build của backend/Dockerfile là GỐC repo. Bỏ những thứ nặng / bí mật không cần cho ảnh.
+.git
+**/node_modules
+backend/target
+backend/.dev
+**/.env
+desc.txt

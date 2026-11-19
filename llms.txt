@@ -30,6 +30,7 @@ Bộ 24 mẫu Markdown (tiếng Việt) theo ISO/IEC/IEEE 12207, 15289, 29148, 4
 - Nhập trang HTML có sẵn (file, thư mục, hoặc dán mã) thành thành phần kéo thả được: tự động (đo style thật trong khung cách ly – giữ màu, font, bố cục, ::before/::after, :hover, @keyframes, phần ẩn trên điện thoại, menu) hoặc nhờ AI (gửi trọn trang, đếm token, cảnh báo khi vượt độ dài ngữ cảnh).
 - Tab Cài đặt gom mọi cài đặt chung vào một chỗ: giao diện sáng / tối / theo hệ thống, trợ lý AI (nhà cung cấp, API key, mô hình, effort, thinking), giọng nói (micro, bộ nhận dạng, giọng đọc), cài như ứng dụng, trạng thái offline và dung lượng dữ liệu đã lưu trong trình duyệt.
 - Chat AI ở mọi tab: viết / sửa tài liệu (tự vẽ diagram và chèn vào tài liệu), diagram và trang web; tab Hướng dẫn sử dụng có tìm kiếm.
+- Làm việc nhóm (tuỳ chọn, tab Dự án, cần máy chủ `backend/` – Rust + MongoDB/Atlas): workspace và group làm phạm vi an ninh, phân quyền theo phạm vi, tài liệu đi qua Dự thảo → Chờ duyệt → Đã duyệt → Đã phát hành → Thay thế với mức bảo mật Riêng tư / Group / Workspace / Công khai, máy chủ đọc mã truy vết để chặn định nghĩa trùng và đánh dấu tài liệu Cần rà soát, ticket góp ý / báo lỗi có AI kiểm tra trùng và đề xuất sửa tài liệu, thông báo, nhật ký.
 - Nhúng vào Markdown: SVG inline (`<div><svg>…</svg></div>`, một dòng) hoặc ảnh PNG base64 (`![…](data:image/png;base64,…)`).
 
 ## Định dạng dữ liệu (JSON)

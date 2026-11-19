@@ -1,0 +1,12 @@
+# Rust
+/target/
+
+# Công cụ và dữ liệu chạy thử trên máy (MongoDB portable, dữ liệu, log) – xem scripts/dev-mongo.ps1
+/.dev/
+
+# Cấu hình cục bộ (chứa bí mật)
+.env
+.env.*
+!.env.example
+node_modules/
+scripts/e2e/shots/

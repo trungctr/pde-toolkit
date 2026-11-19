@@ -1,0 +1,13 @@
+{
+  "name": "chillcat-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Kiểm thử giao diện tab Dự án trên Chrome thật (headless) với máy chủ đang chạy",
+  "scripts": {
+    "ui": "node ui.mjs",
+    "team": "node ui-team.mjs"
+  },
+  "dependencies": {
+    "puppeteer-core": "^24.43.1"
+  }
+}

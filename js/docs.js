@@ -25,6 +25,7 @@
   const VIEW_KEY = 'diagram-editor:md-view';
   const DEV_KEY = 'diagram-editor:md-dev';
   const WS_KEY = 'diagram-editor:workspace';
+  const SRV_KEY = 'diagram-editor:md-server:v1'; // tài liệu đang mở là một phiên bản trên máy chủ (js/hub.js)
   const DEFAULT_NAME = 'tai-lieu.md';
 
   const lsGet = (k) => {
@@ -56,7 +57,13 @@
     savedAt: null, // lần cuối ghi ra file
     libPath: null, // tài liệu mở từ thư viện mẫu: đường dẫn mẫu trong templates/ (để mở liên kết tới mẫu khác)
   };
-  let ws = 'diagram'; // tab đang mở: 'doc' | 'diagram'
+  let ws = 'diagram'; // tab đang mở: 'hub' | 'doc' | 'diagram' | 'design' | 'guide' | 'settings'
+  /**
+   * Phiên bản tài liệu trên máy chủ đang mở trong trình soạn (null = file trên máy).
+   * { versionId, documentId, workspaceId, code, title, version, status, statusLabel, revision, editable }
+   * Khi có: Ctrl+S / nút Lưu ghi lên máy chủ (DE.hub.saveServerDoc); bản không sửa được thì trình soạn chỉ đọc.
+   */
+  let server = null;
   // Mặc định chỉ có trình soạn TRỰC QUAN (như Word). Bật "chế độ developer" mới thấy mã Markdown:
   // 'code' (chỉ mã) | 'split' (mã + trực quan) | 'visual' (chỉ trực quan)
   let view = 'visual';
@@ -466,6 +473,7 @@
     saveLocal();
     updateTitles();
     updateStatus();
+    srvDirtyMark();
   }
   DOCS.flush = flushVisual;
 
@@ -1571,9 +1579,15 @@
     }
   }
 
+  /** dấu "chưa lưu lên máy chủ" trên thanh tài liệu máy chủ (rẻ – gọi được mỗi lần gõ) */
+  function srvDirtyMark() {
+    if (server) $('#doc-srv')?.classList.toggle('dirty', state.dirty);
+  }
+
   function onInput() {
     visualStale = true;
     state.dirty = true;
+    srvDirtyMark();
     state.caret = ta.selectionStart;
     linesDirty = true;
     saveLocal();
@@ -1598,7 +1612,8 @@
     return !!r;
   }
 
-  function setDoc(text, { name, diagrams = {}, handle = null, crlf = false, dirty = false, libPath = null } = {}) {
+  function setDoc(text, { name, diagrams = {}, handle = null, crlf = false, dirty = false, libPath = null, srv = null } = {}) {
+    setServer(srv);
     state.name = name || DEFAULT_NAME;
     state.diagrams = diagrams;
     state.handle = handle;
@@ -1635,6 +1650,65 @@
     const { text, diagrams, count } = collapse(raw.replace(/\r\n?/g, '\n'));
     setDoc(text, { name: file.name, diagrams, handle, crlf });
     toast(`Đã mở "${file.name}"` + (count ? ` – ${count} diagram có thể sửa` : ''), 'ok');
+  };
+
+  // ================================================ TÀI LIỆU TRÊN MÁY CHỦ (tab Dự án)
+  /** Gắn / bỏ gắn phiên bản trên máy chủ; bản không sửa được ⇒ trình soạn chỉ đọc */
+  function setServer(srv) {
+    server = srv ? { ...srv } : null;
+    lsSet(SRV_KEY, server ? JSON.stringify(server) : null);
+    applyServer();
+  }
+  function applyServer() {
+    if (!docview) return;
+    const locked = !!server && !server.editable;
+    ta.readOnly = locked;
+    pv.contentEditable = locked ? 'false' : 'true';
+    docview.classList.toggle('srv-bound', !!server);
+    docview.classList.toggle('srv-locked', locked);
+    const bar = $('#doc-srv');
+    if (bar) {
+      bar.hidden = !server;
+      if (server && DE.hub && DE.hub.renderDocBar) DE.hub.renderDocBar(bar, server, { dirty: state.dirty });
+    }
+  }
+  /**
+   * Mở một phiên bản trên máy chủ trong trình soạn. raw = Markdown (diagram nhúng dạng SVG + JSON như file .md).
+   * Trả về true nếu đã mở (người dùng có thể huỷ khi tài liệu hiện tại có thay đổi chưa lưu).
+   */
+  DOCS.openServerDoc = async function (raw, srv, { confirm = true } = {}) {
+    show('doc');
+    if (confirm && !(await confirmDiscard(`Mở ${srv.code} bản ${srv.version}?`))) return false;
+    const { text, diagrams } = collapse(String(raw).replace(/\r\n?/g, '\n'));
+    setDoc(text, { name: `${srv.code}.md`, diagrams, srv });
+    return true;
+  };
+  /** Phiên bản trên máy chủ đang mở (hoặc null) */
+  DOCS.serverBinding = () => (server ? { ...server } : null);
+  /** Tài liệu đang mở có thay đổi chưa lưu (ra file hoặc lên máy chủ) */
+  DOCS.isDirty = () => state.dirty;
+  /** hub.js gọi sau khi lưu lên máy chủ / đổi trạng thái: cập nhật thông tin gắn, đánh dấu đã lưu */
+  DOCS.updateServer = function (patch, { saved = false } = {}) {
+    if (!server) return;
+    Object.assign(server, patch);
+    lsSet(SRV_KEY, JSON.stringify(server));
+    if (saved) {
+      state.dirty = false;
+      state.savedAt = Date.now();
+      saveLocal();
+    }
+    applyServer();
+    updateTitles();
+  };
+  /** Thay nội dung đang mở bằng bản mới nhất trên máy chủ (không hỏi) */
+  DOCS.reloadServer = function (raw, srv) {
+    const { text, diagrams } = collapse(String(raw).replace(/\r\n?/g, '\n'));
+    setDoc(text, { name: `${srv.code}.md`, diagrams, srv });
+  };
+  /** Bỏ gắn máy chủ: tài liệu thành file trên máy như bình thường */
+  DOCS.detachServer = function () {
+    setServer(null);
+    updateTitles();
   };
 
   /** Mở nội dung một mẫu từ thư viện (js/doc-library.js). Trả về true nếu đã mở */
@@ -1684,6 +1758,8 @@
 
   /** Lưu: ghi thẳng vào file đang mở nếu được, không thì hỏi nơi lưu / tải xuống. Trả về true nếu đã lưu */
   async function saveDoc(as = false) {
+    // phiên bản trên máy chủ: Lưu = ghi lên máy chủ (Ctrl+Shift+S vẫn lưu ra file trên máy)
+    if (server && !as && DE.hub && DE.hub.saveServerDoc) return DE.hub.saveServerDoc();
     flushName();
     const content = serialize();
     if (!as && state.handle) {
@@ -1965,10 +2041,11 @@
     design: 'Nhờ AI dựng / sửa trang web này…',
     guide: 'Hỏi AI cách sử dụng công cụ…',
     settings: 'Hỏi AI…',
+    hub: 'Hỏi AI…',
   };
 
-  const WS_ORDER = ['doc', 'diagram', 'design', 'guide', 'settings'];
-  /** Chuyển tab: 'doc' (Tài liệu) | 'diagram' | 'design' (Thiết kế trang) | 'guide' (Hướng dẫn) | 'settings' (Cài đặt) */
+  const WS_ORDER = ['doc', 'diagram', 'design', 'hub', 'guide', 'settings'];
+  /** Chuyển tab: 'doc' (Tài liệu) | 'diagram' | 'design' (Thiết kế trang) | 'hub' (Dự án) | 'guide' (Hướng dẫn) | 'settings' (Cài đặt) */
   function show(name) {
     if (!WS_ORDER.includes(name)) return;
     const was = ws;
@@ -1983,10 +2060,12 @@
     }
     if (was === 'design' && name !== 'design' && DE.pages) DE.pages.onHide();
     if (was === 'settings' && name !== 'settings' && DE.settings) DE.settings.onHide();
+    if (was === 'hub' && name !== 'hub' && DE.hub) DE.hub.onHide();
     document.body.classList.toggle('ws-doc', doc);
     document.body.classList.toggle('ws-guide', name === 'guide');
     document.body.classList.toggle('ws-settings', name === 'settings');
     document.body.classList.toggle('ws-design', name === 'design');
+    document.body.classList.toggle('ws-hub', name === 'hub');
     document.body.classList.toggle('ws-nodiagram', other);
     docview.hidden = !doc;
     $('#guideview').hidden = name !== 'guide';
@@ -1994,9 +2073,12 @@
     if (dv) dv.hidden = name !== 'design';
     const sv = $('#settingsview');
     if (sv) sv.hidden = name !== 'settings';
+    const hv = $('#hubview');
+    if (hv) hv.hidden = name !== 'hub';
     if (name === 'guide' && DE.guide) DE.guide.render();
     if (name === 'design' && DE.pages) DE.pages.onShow();
     if (name === 'settings' && was !== 'settings' && DE.settings) DE.settings.onShow(was);
+    if (name === 'hub' && was !== 'hub' && DE.hub) DE.hub.onShow(was);
     ['#toolbar', '#stage', '#statusbar'].forEach((q) => ($(q).inert = other));
     ['#palette', '#inspector'].forEach((q) => {
       const el = $(q);
@@ -2102,7 +2184,10 @@
     $('#ws-doc-title').textContent = name;
     $('#ws-doc-dot').hidden = !state.dirty;
     $('#doc-dirty').hidden = !state.dirty;
+    const bar = $('#doc-srv');
+    if (server && bar && DE.hub && DE.hub.renderDocBar) DE.hub.renderDocBar(bar, server, { dirty: state.dirty });
     if (ws === 'doc') document.title = (state.dirty ? '● ' : '') + name + ' – ChillCat Studio';
+    else if (ws === 'hub') document.title = (DE.hub && DE.hub.title ? DE.hub.title() : 'Dự án') + ' – ChillCat Studio';
     else if (ws === 'guide') document.title = 'Hướng dẫn sử dụng – ChillCat Studio';
     else if (ws === 'settings') document.title = 'Cài đặt – ChillCat Studio';
     else if (ws === 'design') document.title = DE.pages ? DE.pages.title() : 'Thiết kế trang – ChillCat Studio';
@@ -2174,6 +2259,15 @@
       ta.value = welcome();
       state.dirty = false;
     }
+    // tài liệu đang mở là phiên bản trên máy chủ (mở lại trang vẫn giữ liên kết)
+    try {
+      const s = JSON.parse(lsGet(SRV_KEY) || 'null');
+      if (s && s.versionId && state.name === `${s.code}.md`) server = s;
+      else lsSet(SRV_KEY, null);
+    } catch (_) {
+      lsSet(SRV_KEY, null);
+    }
+    applyServer();
     $('#doc-name').value = state.name;
     try {
       document.execCommand('defaultParagraphSeparator', false, 'p'); // Enter tạo <p> thay vì <div>
@@ -2393,7 +2487,7 @@
     updateSessionUI();
     renderPreview();
     const savedWs = lsGet(WS_KEY);
-    show(resumed ? 'diagram' : ['doc', 'design', 'guide', 'settings'].includes(savedWs) ? savedWs : 'diagram');
+    show(resumed ? 'diagram' : ['doc', 'design', 'hub', 'guide', 'settings'].includes(savedWs) ? savedWs : 'diagram');
     if (resumed) setTimeout(() => toast('Tiếp tục phiên vẽ diagram cho tài liệu – bấm ✓ để đưa vào tài liệu, hoặc Huỷ', 'info'), 400);
     store.onChange(() => ws === 'diagram' && updateTitles());
   };
@@ -2483,6 +2577,10 @@
   let aiBackup = null;
   /** Thay nội dung tài liệu bằng Markdown do AI viết (có thể hoàn tác). Trả về { count, errors } */
   DOCS.applyAIMarkdown = function (md) {
+    if (server && !server.editable) {
+      toast(`${server.code} bản ${server.version} đang khoá (${server.statusLabel}) – không ghi đè được`, 'warn');
+      return { count: 0, errors: ['Tài liệu đang khoá'] };
+    }
     flushVisual();
     aiBackup = { text: ta.value, diagrams: DE.clone(state.diagrams) };
     const r = importDiagramFences(md);
@@ -2538,6 +2636,7 @@
     flushVisual();
     if (ws === 'guide') return '[Tab hiện tại: Hướng dẫn sử dụng]';
     if (ws === 'settings') return '[Tab hiện tại: Cài đặt]';
+    if (ws === 'hub') return '[Tab hiện tại: Dự án – workspace, tài liệu trên máy chủ, ticket]';
     if (ws !== 'doc') return null; // tab Diagram / Thiết kế trang: ui.js tự gửi kèm dữ liệu của tab
     const text = ta.value;
     let s = `[Tab hiện tại: Tài liệu – file "${state.name}"]\n`;
@@ -2676,11 +2775,11 @@
 
   function onGlobalKey(e) {
     if (document.querySelector('.modal-backdrop')) return;
-    if (e.altKey && !e.ctrlKey && !e.metaKey && ['1', '2', '3', '4', '5'].includes(e.key)) {
+    if (e.altKey && !e.ctrlKey && !e.metaKey && ['1', '2', '3', '4', '5', '6'].includes(e.key)) {
       e.preventDefault();
       return show(WS_ORDER[+e.key - 1]);
     }
-    if (ws === 'diagram' || ws === 'design') return; // tab Hướng dẫn / Cài đặt: Ctrl+S / Ctrl+O vẫn thao tác trên tài liệu
+    if (ws === 'diagram' || ws === 'design' || ws === 'hub') return; // tab Hướng dẫn / Cài đặt: Ctrl+S / Ctrl+O vẫn thao tác trên tài liệu
     const mod = e.ctrlKey || e.metaKey;
     if (!mod || e.altKey) return;
     const k = e.key.toLowerCase();

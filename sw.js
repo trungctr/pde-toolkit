@@ -6,7 +6,7 @@
  * không bao giờ đổi: cache-first trong một cache riêng, giữ qua các lần nâng cấp app.
  * Khi phát hành phiên bản mới có đổi danh sách file, tăng VERSION.
  * ========================================================================= */
-const VERSION = 'v13';
+const VERSION = 'v14';
 const CACHE = `diagram-editor-${VERSION}`;
 const CDN_CACHE = 'diagram-editor-cdn-v1';
 const CDN_ORIGIN = 'https://cdn.jsdelivr.net';
@@ -37,6 +37,10 @@ const PRECACHE = [
   'js/page-editor.js',
   'js/page-import.js',
   'js/settings.js',
+  'js/api.js',
+  'js/hub.js',
+  'js/hub-docs.js',
+  'js/hub-tickets.js',
   'js/main.js',
   'icons/icon.svg',
   'icons/icon-192.png',
@@ -83,6 +87,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   if (url.origin !== self.location.origin) return;
+  // API máy chủ (tab Dự án) và kiểm tra sức khoẻ: không cache, không bao giờ trả bản cũ – dữ liệu riêng của từng người
+  if (/\/api\/|\/(healthz|readyz)$/.test(url.pathname)) return;
 
   const isNav = req.mode === 'navigate';
   event.respondWith(

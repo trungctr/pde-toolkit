@@ -1,0 +1,30 @@
+[package]
+name = "chillcat-tickets"
+description = "Module tickets: góp ý tính năng / báo lỗi, quyền xem / xử lý, AI kiểm tra trùng và đề xuất sửa tài liệu (desc §4.4, §5.4)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+chillcat-kernel.workspace = true
+chillcat-platform.workspace = true
+tokio.workspace = true
+axum.workspace = true
+mongodb.workspace = true
+bson.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+tracing.workspace = true
+reqwest.workspace = true
+rustls.workspace = true
+
+[dev-dependencies]
+chillcat-platform = { workspace = true, features = ["testing"] }
+chillcat-workspaces.workspace = true
+
+[lints]
+workspace = true

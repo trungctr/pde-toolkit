@@ -1,0 +1,75 @@
+# Chạy trọn bộ trên một máy nội bộ: MongoDB (replica set một node) + máy chủ + giao diện.
+#
+#   cd backend/deploy
+#   cp .env.example .env        # rồi đặt JWT_SECRET (>= 32 ký tự ngẫu nhiên)
+#   docker compose up -d --build
+#   → mở http://localhost:8080 (người đăng ký đầu tiên là quản trị)
+#
+# Dùng MongoDB Atlas thay cho container mongo: đặt MONGODB_URI=mongodb+srv://… trong .env rồi
+#   docker compose up -d --build --no-deps app
+#
+# Thư mục riêng (không đặt ở backend/) để Compose không đọc nhầm backend/.env của máy phát triển.
+# Lưu ý: biến môi trường của shell được ưu tiên hơn .env – nếu shell đang có MONGODB_URI của máy phát triển
+# (127.0.0.1:27117) thì container sẽ nối nhầm; bỏ biến đó trước (`Remove-Item Env:MONGODB_URI` / `unset MONGODB_URI`).
+name: chillcat
+
+services:
+  mongo:
+    image: mongo:8.0
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo-data:/data/db
+    # Lần đầu khởi tạo replica set (máy chủ cần transaction), các lần sau chỉ kiểm tra đã có primary.
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - >-
+          try { rs.status() } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }) }
+          quit(db.hello().isWritablePrimary ? 0 : 1)
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 40s
+      start_interval: 2s
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile
+      args:
+        # máy ít RAM: CARGO_BUILD_JOBS=2 trong .env
+        CARGO_BUILD_JOBS: ${CARGO_BUILD_JOBS:-}
+    image: chillcat-studio:latest
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    # Mọi biến trong .env đều tới được container (AUDIT_RETENTION_DAYS, LOG_FORMAT, MONGODB_DB_<MODULE>…);
+    # khối environment dưới đây chỉ đặt mặc định cho những biến cần có.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/?replicaSet=rs0}
+      MONGODB_DB: ${MONGODB_DB:-chillcat}
+      JWT_SECRET: ${JWT_SECRET:?Đặt JWT_SECRET (ít nhất 32 ký tự) trong backend/deploy/.env}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
+      AUTH_ALLOW_REGISTRATION: ${AUTH_ALLOW_REGISTRATION:-true}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      WORKSPACE_CREATION: ${WORKSPACE_CREATION:-all}
+      AI_PROVIDER: ${AI_PROVIDER:-none}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-claude-opus-5-5}
+      AI_FALLBACKS: ${AI_FALLBACKS:-true}
+      RUST_LOG: ${RUST_LOG:-info,tower_http=info,mongodb=warn}
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
