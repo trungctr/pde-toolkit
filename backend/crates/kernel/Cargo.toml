@@ -1,0 +1,18 @@
+[package]
+name = "chillcat-kernel"
+description = "Shared kernel: kiểu dùng chung, lỗi, quyền, hợp đồng giữa các module, sự kiện miền. Không có I/O."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+bson.workspace = true
+
+[lints]
+workspace = true

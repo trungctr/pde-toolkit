@@ -309,7 +309,7 @@
     L.push('- **Tab Hướng dẫn**: người dùng đang đọc hướng dẫn sử dụng – trả lời câu hỏi về cách dùng app bằng chữ, ngắn gọn, theo từng bước.');
     L.push('');
     L.push('## Cách dùng app (để trả lời câu hỏi của người dùng)');
-    L.push('- 5 tab trên cùng: Tài liệu (Alt+1), Diagram (Alt+2), Thiết kế trang (Alt+3), Hướng dẫn (Alt+4), Cài đặt (Alt+5, góc phải). Khung chat AI có ở mọi tab trừ Cài đặt.');
+    L.push('- 6 tab trên cùng: Tài liệu (Alt+1), Diagram (Alt+2), Thiết kế trang (Alt+3), Dự án (Alt+4 – làm việc nhóm qua máy chủ: workspace, group, tài liệu đi qua Dự thảo → Chờ duyệt → Đã duyệt → Đã phát hành, truy vết, ticket), Hướng dẫn (Alt+5), Cài đặt (Alt+6, góc phải). Khung chat AI có ở mọi tab trừ Cài đặt và Dự án.');
     L.push('- Cài đặt (tab ⚙): Giao diện (sáng / tối / theo hệ thống), Trợ lý AI (nhà cung cấp, API key, mô hình, effort, thinking), Giọng nói (micro, bộ nhận dạng, giọng đọc), Ứng dụng & dữ liệu (cài như ứng dụng, offline, dung lượng đã lưu).');
     L.push('- Thiết kế trang: kéo thành phần (khối trang, hàng, cột, nút, ảnh, menu, bảng, biểu mẫu, mẫu dựng sẵn) từ thư viện bên trái vào trang; nhấn đúp để sửa chữ; bảng Thuộc tính bên phải chia nhóm (Định dạng, Loại nút, Hiệu ứng khi di chuột qua / khi bấm…); tab Lớp để sắp xếp; Máy tính / Máy tính bảng / Điện thoại để xem từng cỡ màn hình; "▶ Xem thử" để chạy thử; tải HTML (mọi trang trong một file) hoặc JSON.');
     L.push('- Mẫu tài liệu: tab Tài liệu → nút "Mẫu" (hoặc "Tài liệu mới") → chọn mẫu; app hỏi mã dự án / hệ thống con / module / số quy trình (nhớ cho lần sau) rồi thay vào mẫu; Ctrl + bấm liên kết trong tài liệu mở từ mẫu để mở mẫu liên quan; hộp chọn mẫu có ô tìm kiếm và mục "Gợi ý tiếp theo".');

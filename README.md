@@ -6,6 +6,10 @@ và ERD**) nhúng thẳng vào tài liệu **Markdown**, tab **thiết kế tran
 **Chat AI** – gõ hoặc **nói** – để AI viết tài liệu, vẽ diagram, dựng trang. HTML + CSS + JavaScript thuần, không cần
 build, không phụ thuộc thư viện ngoài; mọi đối tượng được quản lý bằng **JSON**.
 
+Làm việc nhóm (tuỳ chọn): tab **Dự án** kết nối máy chủ trong [`backend/`](backend/README.md) (Rust + MongoDB/Atlas) để quản lý
+workspace, group, phân quyền, tài liệu theo quy trình **Dự thảo → Chờ duyệt → Đã duyệt → Đã phát hành**, truy vết mã giữa các
+tài liệu và ticket góp ý / báo lỗi có AI kiểm tra trùng. Không có máy chủ thì các tab còn lại vẫn chạy như cũ.
+
 **Dùng ngay:** <https://design.trungctr.com/> (cài được như ứng dụng, chạy cả khi offline).
 
 ## Mục lục
@@ -28,6 +32,9 @@ Mở trực tiếp `index.html` bằng Chrome / Edge / Firefox (hỗ trợ cả 
 bất kỳ, ví dụ `npx serve .` hay `python -m http.server`. Cần chạy qua `http(s)://` thì PWA (cài đặt, offline)
 mới hoạt động. Khi mở bằng `file://`, trình duyệt không cho đọc file cục bộ nên mẫu tài liệu được tải từ bản
 online (cần mạng).
+
+Tab **Dự án** cần máy chủ: xem [backend/README.md](backend/README.md) – máy chủ phục vụ luôn giao diện này
+(`STATIC_DIR`), mở `http://localhost:8080`.
 
 ## Tính năng
 
@@ -88,7 +95,7 @@ chạy offline nhờ service worker (network-first), mở file `.json` trực ti
 
 ### Tab Cài đặt
 
-Mọi cài đặt chung gom vào tab **⚙ Cài đặt** (góc phải thanh tab, `Alt+5`) thay vì rải trên toolbar và khung chat.
+Mọi cài đặt chung gom vào tab **⚙ Cài đặt** (góc phải thanh tab, `Alt+6`) thay vì rải trên toolbar và khung chat.
 Cột trái có 4 nhóm; nhóm vừa xem được nhớ lại, nút **← Quay lại** đưa về tab đang làm. Khung chat AI ẩn ở tab này.
 
 | Nhóm | Nội dung | Lưu |
@@ -134,15 +141,16 @@ nối và bảng "sửa gì thì cập nhật gì"; mỗi mẫu có dòng *Tài 
 
 ## Tài liệu Markdown
 
-App có năm tab ở trên cùng: **Tài liệu** (soạn / xem file `.md`, `Alt+1`), **Diagram** (whiteboard, `Alt+2`),
-**Thiết kế trang** (dựng trang web bằng kéo thả, `Alt+3`), **Hướng dẫn** (hướng dẫn sử dụng có mục lục, tìm kiếm và
-ví dụ gửi thẳng vào chat AI, `Alt+4`) và **⚙ Cài đặt** (góc phải, `Alt+5`). Diagram luôn được
+App có sáu tab ở trên cùng: **Tài liệu** (soạn / xem file `.md`, `Alt+1`), **Diagram** (whiteboard, `Alt+2`),
+**Thiết kế trang** (dựng trang web bằng kéo thả, `Alt+3`), **Dự án** (làm việc nhóm qua máy chủ, `Alt+4`), **Hướng dẫn**
+(hướng dẫn sử dụng có mục lục, tìm kiếm và ví dụ gửi thẳng vào chat AI, `Alt+5`) và **⚙ Cài đặt** (góc phải, `Alt+6`).
+Tài liệu mở từ tab Dự án hiện thanh xanh phía trên trình soạn: `Ctrl+S` lưu lên máy chủ, bản đang duyệt / đã phát hành chỉ đọc. Diagram luôn được
 vẽ ở tab Diagram rồi nhúng vào tài liệu; muốn sửa thì mở lại diagram đó ở tab Diagram.
 
 Thanh công cụ chia theo nhóm; khi màn hình hẹp, các nhóm tự xuống hàng – không nút nào bị ẩn.
 
 ```text
-[ 📄 Tài liệu · thiet-ke.md ● ] [ ◆ Diagram  mới ] …          Alt+1 … Alt+5 chuyển tab  [ ⚙ Cài đặt ]
+[ 📄 Tài liệu · thiet-ke.md ● ] [ ◆ Diagram  mới ] … [ 🗂 Dự án ] …  Alt+1 … Alt+6 chuyển tab  [ ⚙ Cài đặt ]
 ┌─────────────────────────────────┬──────────────────────────────────────────┐
 │ # Thiết kế                      │ Thiết kế                                 │
 │                                 │ ─────────                                │
@@ -603,7 +611,7 @@ Thời gian & ngôn ngữ → Giọng nói → Thêm giọng → Tiếng Việt 
 | Thu gọn / mở panel | `Ctrl+B` (thư viện) / `Ctrl+Alt+B` (thuộc tính) |
 | Gửi prompt cho AI | `Ctrl+Enter` trong ô chat |
 | Nói với AI | `Ctrl+M` (nói xong tự gửi) · `Ctrl+Shift+M` rảnh tay · `Esc` huỷ khi đang nghe |
-| Chuyển tab Tài liệu / Diagram / Thiết kế trang / Hướng dẫn / Cài đặt | `Alt+1` … `Alt+5` |
+| Chuyển tab Tài liệu / Diagram / Thiết kế trang / Dự án / Hướng dẫn / Cài đặt | `Alt+1` … `Alt+6` |
 | Tab Tài liệu | `Ctrl+S` lưu · `Ctrl+Shift+S` lưu thành · `Ctrl+O` mở · `Ctrl+B` / `Ctrl+I` / `Ctrl+K` / `Ctrl+E` đậm / nghiêng / link / code |
 | Tab Thiết kế trang | Nhấn đúp / `Enter` / `F2` sửa chữ · `Esc` chọn khung chứa · `↑` `↓` thành phần trước / sau · `Alt+↑` / `Alt+↓` đổi thứ tự · `Ctrl+C` / `Ctrl+X` / `Ctrl+V` / `Ctrl+D` · `Delete` · `Ctrl+Z` / `Ctrl+Y` · `Ctrl+S` tải JSON · `Ctrl+O` mở |
 
@@ -709,6 +717,10 @@ js/guide.js            tab Hướng dẫn: nội dung hướng dẫn sử dụng
 js/page-kit.js         thiết kế trang – lõi: danh mục thành phần & thuộc tính, chuẩn hoá / lọc JSON, sinh HTML + CSS, file HTML xuất ra, skill AI
 js/page-editor.js      thiết kế trang – giao diện: khung iframe, kéo thả, sửa chữ trực tiếp, bảng thuộc tính, lớp, trang, xem thử
 js/settings.js         tab Cài đặt: giao diện sáng / tối, trợ lý AI (form + effort / thinking), giọng nói, ứng dụng & dữ liệu
+js/api.js              client gọi máy chủ (backend/): địa chỉ máy chủ, phiên đăng nhập, tự làm mới token, lỗi tiếng Việt
+js/hub.js              tab Dự án – khung: kết nối, đăng nhập, workspace, thành viên / group / hệ thống con, thông báo, nhật ký
+js/hub-docs.js         tab Dự án – tài liệu: sổ đăng ký, vòng đời duyệt – phát hành, nhận xét, quan hệ, truy vết, thanh máy chủ ở tab Tài liệu
+js/hub-tickets.js      tab Dự án – ticket: góp ý / báo lỗi, xử lý, AI kiểm tra trùng / đề xuất tài liệu, quyền ticket
 js/editor.js           tương tác canvas (chọn, kéo, resize, nối, phím tắt)
 js/ui.js               toolbar, thư viện, bảng thuộc tính, tab JSON, trợ giúp, khung chat AI
 js/main.js             khởi động, tự lưu, PWA
@@ -718,6 +730,7 @@ icons/                 icon SVG gốc + PNG (192 / 512, maskable, apple-touch-ic
 templates/             24 mẫu tài liệu thiết kế phần mềm (Markdown + diagram nhúng), README hướng dẫn bộ mẫu
 llms.txt, robots.txt, sitemap.xml, og-image.png   SEO / AI SEO
 .nojekyll              tắt Jekyll trên GitHub Pages để file .md trong templates/ được phục vụ nguyên bản
+backend/               máy chủ Rust + MongoDB cho tab Dự án (monolith chia module, sẵn sàng tách microservice) – xem backend/README.md
 ```
 
 ### Thêm một hình mới
@@ -747,3 +760,8 @@ Trang chạy trên **GitHub Pages** (Deploy from a branch: `main`, thư mục `/
   trong Settings → Pages.
 - Khi phát hành bản mới có thêm / bớt file: cập nhật `PRECACHE` và tăng `VERSION` trong `sw.js`; cập nhật
   `<lastmod>` trong `sitemap.xml` khi nội dung trang thay đổi.
+
+Bản nội bộ có tab **Dự án**: chạy `backend/` (một tiến trình phục vụ cả API `/api/v1` lẫn giao diện), MongoDB Atlas hoặc
+replica set tự quản – hướng dẫn ở [backend/README.md](backend/README.md). Service worker không bao giờ cache `/api/`.
+Nhanh nhất trên một máy có Docker: `cd backend/deploy`, chép `.env.example` thành `.env` và đặt `JWT_SECRET`, rồi
+`docker compose up -d --build` (MongoDB + máy chủ + giao diện ở <http://localhost:8080>).

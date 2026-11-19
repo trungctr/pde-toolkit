@@ -18,7 +18,8 @@
 **ChillCat Studio** là bộ công cụ soạn **tài liệu thiết kế phần mềm**: viết tài liệu như soạn văn bản, bắt đầu từ
 **24 mẫu tài liệu** theo ISO/IEC/IEEE 12207, vẽ diagram (Flowchart, BPMN, UML, ERD) trên whiteboard rồi nhúng vào tài liệu,
 **thiết kế trang web bằng kéo thả**, và nhờ **AI** viết giúp cả tài liệu, diagram lẫn trang web. Mọi thứ chạy ngay trên
-trình duyệt, không cần tài khoản, dữ liệu nằm trên máy bạn.
+trình duyệt, không cần tài khoản, dữ liệu nằm trên máy bạn. Khi cần làm việc nhóm, tab **[Dự án](#go-hub)** kết nối máy chủ của
+nhóm để cùng soạn, duyệt, phát hành tài liệu và xử lý góp ý / báo lỗi.
 
 ## Bắt đầu nhanh
 
@@ -38,21 +39,22 @@ trình duyệt, không cần tài khoản, dữ liệu nằm trên máy bạn.
 
 ## Giao diện
 
-Năm tab ở trên cùng:
+Sáu tab ở trên cùng:
 
 | Tab | Phím tắt | Dùng để |
 | --- | --- | --- |
 | 📄 **Tài liệu** | \`Alt+1\` | Soạn và xem tài liệu \`.md\`, nhúng diagram |
 | ◆ **Diagram** | \`Alt+2\` | Whiteboard vẽ diagram |
 | ▤ **Thiết kế trang** | \`Alt+3\` | Dựng trang web bằng kéo thả, xuất file HTML |
-| ❓ **Hướng dẫn** | \`Alt+4\` | Trang bạn đang đọc |
-| ⚙ **Cài đặt** | \`Alt+5\` | Sáng / tối, trợ lý AI, giọng nói, cài như ứng dụng (tab ở góc phải) |
+| 🗂 **Dự án** | \`Alt+4\` | Làm việc nhóm qua máy chủ: tài liệu theo quy trình duyệt, truy vết, ticket (cần đăng nhập) |
+| ❓ **Hướng dẫn** | \`Alt+5\` | Trang bạn đang đọc |
+| ⚙ **Cài đặt** | \`Alt+6\` | Sáng / tối, trợ lý AI, giọng nói, cài như ứng dụng (tab ở góc phải) |
 
 Thanh công cụ chia thành **các nhóm**; khi cửa sổ hẹp, các nhóm tự **xuống hàng** để mọi nút vẫn luôn hiện đủ.
 
 ### Cài đặt
 
-Mọi cài đặt chung nằm ở tab **⚙ Cài đặt** (\`Alt+5\`), chia 4 nhóm ở cột trái. Đổi là lưu ngay (riêng phần nhà cung cấp AI
+Mọi cài đặt chung nằm ở tab **⚙ Cài đặt** (\`Alt+6\`), chia 4 nhóm ở cột trái. Đổi là lưu ngay (riêng phần nhà cung cấp AI
 bấm **Lưu cài đặt AI**). Nút **← Quay lại** ở góc dưới trái đưa bạn về tab đang làm.
 
 | Nhóm | Có gì |
@@ -352,6 +354,27 @@ Bấm **Nhập HTML** trên thanh công cụ (hoặc **kéo thả file \`.html\`
 - **Tải xuống JSON** (\`Ctrl+S\`): file dự án để mở lại và sửa tiếp (nút Mở, \`Ctrl+O\`, hoặc kéo thả file vào cửa sổ).
 - Dự án **tự lưu vào trình duyệt**. Ảnh tải lên được nhúng thẳng vào dự án (ảnh lớn tự thu nhỏ còn cạnh dài 1600px).
 
+## Dự án (làm việc nhóm)
+
+Tab **[🗂 Dự án](#go-hub)** (\`Alt+4\`) kết nối **máy chủ ChillCat Studio** của nhóm (thư mục \`backend/\`). Các tab khác vẫn
+chạy như cũ, không cần máy chủ.
+
+- **Workspace** ứng với một dự án, có **mã dự án** (ví dụ \`SHOP\`) – tiền tố mã mọi tài liệu. Người tạo là **workspace owner**.
+- **Group** là phạm vi an ninh: mỗi tài liệu thuộc đúng một group; **group owner** có mọi quyền tài liệu trong group và là người
+  **duyệt**. Mời người vào workspace / group ở mục **Thành viên** – không ai cấp được quyền lớn hơn quyền mình có.
+- **Tài liệu** tạo từ 24 mẫu, mã tự sinh (\`SHOP-SRS-ORD-001\`). Mỗi bản đi qua **Dự thảo → Chờ duyệt → Đã duyệt → Đã phát hành**;
+  phát hành bản mới thì bản cũ thành **Thay thế**. Mỗi bản dự thảo có đúng một người soạn – người khác nhận xét.
+- Bấm **Soạn trong tab Tài liệu**: tài liệu mở ra kèm thanh xanh phía trên; \`Ctrl+S\` lưu lên máy chủ (\`Ctrl+Shift+S\` vẫn lưu ra file).
+  Bản đang chờ duyệt / đã phát hành mở ở chế độ chỉ đọc.
+- Trước khi **gửi duyệt** và **phát hành**, máy chủ kiểm tra: bảng thuộc tính đầu tài liệu đủ, tài liệu tầng trên (↑) đã phát hành,
+  mã truy vết không trùng / không trỏ tới mã chưa có, mức bảo mật của tài liệu được trỏ tới.
+- **Truy vết**: mỗi lần lưu, máy chủ đọc mã (\`StR-01\`, \`UC-ORD-01\`, \`FR-ORD-CART-001\`…) để biết tài liệu nào định nghĩa, tài liệu
+  nào tham chiếu. Tài liệu tầng trên phát hành bản mới làm đổi / bỏ một mã ⇒ các tài liệu dùng mã đó được đánh dấu **Cần rà soát**.
+- **Ticket**: ai đăng nhập cũng gửi được góp ý / báo lỗi cho một dự án (kể cả chưa là thành viên). Quyền xem và xử lý ticket
+  do workspace owner cấp cho cá nhân hoặc group. Người xử lý có thể nhờ AI **kiểm tra trùng** và **đề xuất sửa tài liệu** –
+  AI chỉ thấy những gì người đó được xem, kết quả là gợi ý để người xử lý quyết định.
+- **Thông báo** (số đỏ trên tab) báo tài liệu chờ duyệt, bị trả lại, cần rà soát, ticket được giao…
+
 ## Chat AI
 
 ### Cài đặt lần đầu
@@ -420,7 +443,7 @@ ChatGPT, Gemini, Claude… kèm yêu cầu. Sau đó:
 
 | Ở đâu | Phím | Việc |
 | --- | --- | --- |
-| Mọi nơi | \`Alt+1\` … \`Alt+5\` | Tab Tài liệu / Diagram / Thiết kế trang / Hướng dẫn / Cài đặt |
+| Mọi nơi | \`Alt+1\` … \`Alt+6\` | Tab Tài liệu / Diagram / Thiết kế trang / Dự án / Hướng dẫn / Cài đặt |
 | Mọi nơi | \`Ctrl+Enter\` (trong ô chat) | Gửi cho AI |
 | Mọi nơi | \`Ctrl+M\` · \`Ctrl+Shift+M\` | Nói với AI · rảnh tay |
 | Tài liệu | \`Ctrl+S\` · \`Ctrl+Shift+S\` · \`Ctrl+O\` | Lưu · lưu thành · mở |
@@ -442,7 +465,7 @@ ChatGPT, Gemini, Claude… kèm yêu cầu. Sau đó:
 
 **Dữ liệu của tôi lưu ở đâu?**
 Trong trình duyệt của bạn (tự lưu) và trong file bạn lưu ra. Không có máy chủ nào nhận tài liệu của bạn – trừ nội dung bạn
-gửi cho nhà cung cấp AI khi chat.
+gửi cho nhà cung cấp AI khi chat, và tài liệu bạn chủ động mở / lưu ở tab **Dự án** (máy chủ của nhóm bạn).
 
 **Dùng không có mạng được không?**
 Được. Vào **[⚙ Cài đặt → Ứng dụng & dữ liệu](#go-settings-app)** → **⬇ Cài đặt ứng dụng** (hoặc biểu tượng cài trên thanh địa chỉ) để dùng như một ứng dụng, kể cả offline.
@@ -527,7 +550,7 @@ hosting tĩnh nào (GitHub Pages, Netlify, Cloudflare Pages…). Nếu nút gọ
       if (!a) return;
       e.preventDefault();
       const id = decodeURIComponent(a.getAttribute('href').slice(1));
-      const go = id.match(/^(?:md-)?go-(doc|diagram|design|guide)$/);
+      const go = id.match(/^(?:md-)?go-(doc|diagram|design|hub|guide)$/);
       if (go) return DE.docs.show(go[1]);
       if (/^(?:md-)?go-templates$/.test(id) && DE.docLib) {
         DE.docs.show('doc');

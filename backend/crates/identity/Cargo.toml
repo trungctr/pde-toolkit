@@ -1,0 +1,29 @@
+[package]
+name = "chillcat-identity"
+description = "Module identity: tài khoản, đăng nhập, phiên (refresh token xoay vòng), quản trị người dùng."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+chillcat-kernel.workspace = true
+chillcat-platform.workspace = true
+tokio.workspace = true
+axum.workspace = true
+http.workspace = true
+mongodb.workspace = true
+bson.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+tracing.workspace = true
+argon2.workspace = true
+sha2.workspace = true
+uuid.workspace = true
+
+
+[lints]
+workspace = true

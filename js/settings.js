@@ -35,7 +35,7 @@
     { id: 'voice', name: 'Giọng nói', sub: 'Micro, lệnh, giọng đọc', icon: 'M9 3h6v11H9zM5 11a7 7 0 0014 0M12 18v3' },
     { id: 'app', name: 'Ứng dụng & dữ liệu', sub: 'Cài đặt, offline, bộ nhớ', icon: 'M4 6c0-1.7 3.6-3 8-3s8 1.3 8 3-3.6 3-8 3-8-1.3-8-3zM4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3' },
   ];
-  const WS_NAME = { doc: 'Tài liệu', diagram: 'Diagram', design: 'Thiết kế trang', guide: 'Hướng dẫn' };
+  const WS_NAME = { doc: 'Tài liệu', diagram: 'Diagram', design: 'Thiết kế trang', hub: 'Dự án', guide: 'Hướng dẫn' };
 
   let sec = SECTIONS.some((s) => s.id === lsGet(SEC_KEY)) ? lsGet(SEC_KEY) : 'look';
   let prev = null; // tab đang mở trước khi vào Cài đặt
@@ -185,6 +185,9 @@
     'diagram-editor:page:v1': 'Dự án thiết kế trang',
     'diagram-editor:ai': 'Cài đặt AI (gồm API key)',
     'diagram-editor:voice': 'Cài đặt giọng nói',
+    'diagram-editor:server': 'Địa chỉ máy chủ (tab Dự án)',
+    'diagram-editor:session': 'Phiên đăng nhập máy chủ khác địa chỉ (refresh token)',
+    'diagram-editor:md-server:v1': 'Liên kết tài liệu đang mở với máy chủ',
   };
   const kb = (n) => (n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
   function storageRows() {
@@ -231,13 +234,14 @@
       ['Alt+1', 'Tài liệu'],
       ['Alt+2', 'Diagram'],
       ['Alt+3', 'Thiết kế trang'],
-      ['Alt+4', 'Hướng dẫn'],
-      ['Alt+5', 'Cài đặt'],
+      ['Alt+4', 'Dự án'],
+      ['Alt+5', 'Hướng dẫn'],
+      ['Alt+6', 'Cài đặt'],
       ['Ctrl+M', 'Nói với AI · Ctrl+Shift+M: rảnh tay'],
       ['Ctrl+Enter', 'Gửi tin nhắn cho AI'],
     ];
     body.innerHTML =
-      `<header class="set-head"><h2>Ứng dụng & dữ liệu</h2><p>Mọi thứ chạy ngay trong trình duyệt – không cần tài khoản, không gửi tài liệu lên máy chủ nào.</p></header>` +
+      `<header class="set-head"><h2>Ứng dụng & dữ liệu</h2><p>Tài liệu, Diagram, Thiết kế trang chạy ngay trong trình duyệt – không cần tài khoản. Chỉ tab Dự án (làm việc nhóm) gửi tài liệu lên máy chủ của nhóm, khi bạn đăng nhập.</p></header>` +
       `<section class="set-card"><h3>Cài như ứng dụng</h3>` +
       `<div class="set-row"><div class="set-row-text"><span>${esc(installNote)}</span></div>${installRow}</div>` +
       `<div class="set-row"><div class="set-row-text"><b>Chạy offline</b><span>${

@@ -1,0 +1,64 @@
+[workspace]
+resolver = "2"
+members = ["crates/*", "apps/server"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+publish = false
+
+# Mỗi crate trong crates/ là một module nghiệp vụ độc lập (bounded context). Các module KHÔNG phụ thuộc
+# lẫn nhau: chỉ phụ thuộc `chillcat-kernel` (hợp đồng) và `chillcat-platform` (hạ tầng). Việc ghép nối
+# nằm ở apps/server. Xem README.md (mục Kiến trúc).
+[workspace.dependencies]
+chillcat-kernel = { path = "crates/kernel" }
+chillcat-platform = { path = "crates/platform" }
+chillcat-identity = { path = "crates/identity" }
+chillcat-workspaces = { path = "crates/workspaces" }
+chillcat-documents = { path = "crates/documents" }
+chillcat-traceability = { path = "crates/traceability" }
+chillcat-tickets = { path = "crates/tickets" }
+chillcat-notifications = { path = "crates/notifications" }
+chillcat-audit = { path = "crates/audit" }
+
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync", "time", "net"] }
+axum = { version = "0.8", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.7", features = ["cors", "trace", "fs", "set-header", "limit", "timeout", "compression-gzip"] }
+http = "1"
+# Driver chính thức; TLS bằng rustls + ring (kết nối Atlas `mongodb+srv://` không cần OpenSSL).
+mongodb = "3.10"
+bson = { version = "2", features = ["chrono-0_4"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v7", "serde"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+async-trait = "0.1"
+futures = "0.3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+dotenvy = "0.15"
+regex = "1"
+argon2 = "0.6"
+jsonwebtoken = { version = "12", default-features = false, features = ["rust_crypto"] }
+sha2 = "0.11"
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "json", "http2"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+
+[profile.dev]
+# Bản debug đầy đủ rất nặng với driver MongoDB; chỉ giữ số dòng để backtrace vẫn đọc được.
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = "debuginfo"
+
+[workspace.lints.clippy]
+# AppError mang mã, thông điệp tiếng Việt, chi tiết JSON và lỗi gốc: lớn hơn ngưỡng 128 byte của clippy. Lỗi chỉ đi
+# qua ở đường xử lý lỗi của máy chủ web – không ảnh hưởng hiệu năng; giữ cấu trúc phẳng cho dễ dùng ở mọi module.
+result_large_err = "allow"

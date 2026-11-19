@@ -1,0 +1,33 @@
+[package]
+name = "chillcat-platform"
+description = "Hạ tầng dùng chung: cấu hình, MongoDB (kết nối, transaction, chỉ mục), outbox, HTTP (lỗi, xác thực), JWT."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+# Tiện ích cho kiểm thử tích hợp (CSDL tạm, token thử). Bật trong [dev-dependencies] của module.
+testing = []
+
+[dependencies]
+chillcat-kernel.workspace = true
+tokio.workspace = true
+axum.workspace = true
+http.workspace = true
+mongodb.workspace = true
+bson.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+tracing.workspace = true
+jsonwebtoken.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+
+[lints]
+workspace = true
